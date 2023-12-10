@@ -10,3 +10,4 @@ def create_session():
     engine = create_engine('sqlite:///university_system.db')
     Session = sessionmaker(bind=engine)
     return Session()
+
