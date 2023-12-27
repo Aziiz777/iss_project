@@ -2,15 +2,18 @@
 import socket
 import threading
 import json
+import base64
+import secrets
+from eth_account import Account
+import pickle
 from database.db_manager import create_session
 from database.models import User
-from database.db_operations import create_account,login,complete_user_data,add_national_id,get_user_data
-from symmetric_encryption import encrypt_data,decrypt_data
-import base64
+from database.db_operations import create_account,login,complete_user_data,add_national_id,get_user_data,handShaking,add_project_descriptions
+from symmetric_encryption import encrypt_data,decrypt_data,encrypt_message,decrypt_message
 
 
 
-def handle_client(client_socket, session):
+def handle_client(client_socket, session,server_public_key=None):
    
 
     try:
@@ -28,14 +31,19 @@ def handle_client(client_socket, session):
                 jwt_token = headers['Authorization']
                 # Extract the token part from the Authorization header
                 # _, jwt_token = auth_header.split(' ', 1)
-        print("after jwt ")
-   
+        if request_json['action'] == 'handshake':
+            client_public_key= request_json['data']['public_key']
+            session_key = request_json['data']['session_key']
+            signature = request_json['data']['signature']
+            user_id = request_json['data']['user_id']
+            handShaking_handler(client_socket, session, client_public_key,session_key,signature,user_id,jwt_token,server_public_key)
 
         # Process the request
         if request_json['action'] == 'create_account':
             username = request_json['data']['username']
             password = request_json['data']['password']
-            create_account_handler(client_socket, session, username, password)
+            role = request_json['data']['role']
+            create_account_handler(client_socket, session, username, password,role)
 
         elif request_json['action'] == 'login':
             username = request_json['data']['username']
@@ -73,6 +81,24 @@ def handle_client(client_socket, session):
 
 
             complete_user_data_handler(client_socket, session, user_id, phone_number, mobile_number, address, national_id, jwt_token)
+        elif request_json['action'] == 'project_descriptions':
+            # print('entered the action block1')
+            user_data = get_user_data(session, jwt_token)
+            # print('entered the action block2')
+            encrypted_request_data = base64.b64decode(request_json['data'])
+            # print(f"here is the encrypted_request_data  {encrypted_request_data}")
+            decrypted_request_data = decrypt_data(user_data['session_key'], encrypted_request_data)
+            # print('entered the action block3')
+            decrypted_request_json = json.loads(decrypted_request_data)
+            # print('entered the action block4')
+
+            user_id = decrypted_request_json['user_id']
+            project_descriptions = decrypted_request_json['project_descriptions']
+            jwt_token = decrypted_request_json['jwt_token']
+            # print(' the action block')
+
+
+            project_descriptions_handler(client_socket, session, user_id,project_descriptions,user_data['session_key'], jwt_token)
 
         else:
             send_response(client_socket, {'status': 'error', 'message': 'Invalid action'})
@@ -85,8 +111,8 @@ def handle_client(client_socket, session):
         client_socket.close()
 
 # Function to create a new account
-def create_account_handler(client_socket, session, username, password):
-    response_data = create_account(session, username, password)
+def create_account_handler(client_socket, session, username, password,role):
+    response_data = create_account(session, username, password,role)
     send_response(client_socket, response_data)
 
 # Function to handle login
@@ -114,15 +140,15 @@ def complete_user_data_handler(client_socket, session, user_id, phone_number, mo
             national_id,
             jwt_token
         )
-
-        
         response_json = json.dumps(response_data)
+        print(f'data raw::: {response_data}')
 
 
         encrypted_response_data = encrypt_data(national_id, response_json)
 
         # Convert bytes to base64 before sending
         encrypted_response_base64 = base64.b64encode(encrypted_response_data).decode('utf-8')
+        print(f"error ::: {encrypted_response_base64}")
 
         send_response(client_socket, {'data': encrypted_response_base64})
         print("error here 4")
@@ -131,7 +157,34 @@ def complete_user_data_handler(client_socket, session, user_id, phone_number, mo
         print(f"Error handling complete_user_data request: {e}")
         send_response(client_socket, {'status': 'error', 'message': 'Server error'})
 
+def handShaking_handler(client_socket,session,client_public_key,session_key,signature,user_id,jwt_token,server_public_key):
+    response_data = handShaking(session,client_public_key,session_key,signature,user_id,jwt_token,server_public_key)
+    send_response(client_socket,response_data)
 
+def project_descriptions_handler(client_socket, session, user_id, project_descriptions,session_key,jwt_token):
+    try:
+        response_data = add_project_descriptions(
+            session,
+            jwt_token,
+            user_id,
+            project_descriptions,
+        )
+        response_json = json.dumps(response_data)
+        print(f'data raw::: {response_data}')
+
+
+        encrypted_response_data = encrypt_data(session_key, response_json)
+
+        # Convert bytes to base64 before sending
+        encrypted_response_base64 = base64.b64encode(encrypted_response_data).decode('utf-8')
+        print(f"error ::: {encrypted_response_base64}")
+
+        send_response(client_socket, {'data': encrypted_response_base64})
+        print("error here 4")
+
+    except Exception as e:
+        print(f"Error handling complete_user_data request: {e}")
+        send_response(client_socket, {'status': 'error', 'message': 'Server error'})
 
 
 def send_response(client_socket, response_data):
@@ -142,22 +195,38 @@ def send_response(client_socket, response_data):
         
         length = str(len(response_data)).ljust(16)
 
-
-        client_socket.send(length.encode('utf-8'))
-
-
-        client_socket.send(response_data.encode('utf-8'))
-
-
+        if client_socket.fileno() != -1:
+            # Socket is open, proceed with sending data
+            print(f"send length : {length.encode('utf-8')}")
+            client_socket.send(length.encode('utf-8'))
+            print(f"send data : {response_data.encode('utf-8')}")
+            client_socket.send(response_data.encode('utf-8'))
+        else:
+            # Socket is closed, handle accordingly
+            print("Socket is closed.")
     except ConnectionAbortedError:
         print("Connection aborted by the client.")
     finally:
         client_socket.close()
 
 
-# Function to hash a password using SHA-256
-# def hash_password(password):
-#     return hashlib.sha256(password.encode('utf-8')).hexdigest()
+
+def generate_key_pair():
+    priv = secrets.token_hex(32)
+    private_key = "0x" + priv
+    acct = Account.from_key(private_key)
+
+    # Get the Ethereum address from the account
+    address = acct.address
+
+    print(f"private_key: {private_key}, public_key: {address}")
+
+    return {
+        "private_key": private_key,
+        "public_key": address
+    }
+
+
 
 
 def start_server():
@@ -172,13 +241,21 @@ def start_server():
 
     print(f"Server listening on {host}:{port}")
 
+    # Save the server's key pair
+    keys_info = generate_key_pair()
+    # with open('server_private_key.pem', 'wb') as f:
+    #     f.write(keys_info["private_key"].to_pem())
+
+    # with open('server_public_key.pem', 'wb') as f:
+    #     f.write(keys_info["public_key"].to_pem())
+
     try:
         while True:
             client_socket, addr = server_socket.accept()
             print(f"Accepted connection from {addr}")
 
             # Start a new thread for each client
-            client_thread = threading.Thread(target=handle_client, args=(client_socket, create_session()))
+            client_thread = threading.Thread(target=handle_client, args=(client_socket, create_session(),keys_info["public_key"]))
             client_thread.start()
 
     except KeyboardInterrupt:

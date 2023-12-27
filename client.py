@@ -2,14 +2,16 @@
 import socket
 import json
 import base64
-
+import pickle
+import secrets
+from eth_account import Account,messages
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives import padding
 
-def send_request(action, data,jwt_token=None):
+def send_request(action, data,jwt_token=None,session_key=None):
     host = '127.0.0.1'
     port = 12345
 
@@ -46,8 +48,20 @@ def send_request(action, data,jwt_token=None):
             # Send the length of the data after sending the JSON
             length = len(request_json)
             client_socket.send(str(length).encode('utf-8').ljust(16))
-            
+        elif action == 'project_descriptions':
+            session_key = data['session_key']
+            encrypted_data = encrypt_data(session_key,json.dumps(request_data['data']))
+            encrypted_data_base64 = base64.b64encode(encrypted_data).decode('utf-8')
+            request_data['data'] = encrypted_data_base64
+            print(f"The request_data is: {request_data}")
+            request_json = json.dumps(request_data)
+            client_socket.send(request_json.encode('utf-8'))
 
+            # Send the length of the data after sending the JSON
+            length = len(request_json)
+            client_socket.send(str(length).encode('utf-8').ljust(16))
+            
+            
         else:
             request_json = json.dumps(request_data)
             client_socket.send(request_json.encode('utf-8'))
@@ -67,6 +81,7 @@ def send_request(action, data,jwt_token=None):
         print(f"Received response: {received_data.decode('utf-8')}")
 
         try:
+            print("enter try ")
             # Decrypt data if the action is "complete_user_data"
             if action == 'complete_user_data':
                 # Decode base64 before decrypting
@@ -75,6 +90,14 @@ def send_request(action, data,jwt_token=None):
                 response_json = json.loads(received_data.decode('utf-8'))
                 encrypted_data = base64.b64decode(response_json.get('data', '').strip())
                 decrypted_response = decrypt_data(national_id, encrypted_data)
+            if action == 'project_descriptions':
+                # Decode base64 before decrypting
+                print(f"Recieved dataaa: {received_data.strip()}")
+
+                response_json = json.loads(received_data.decode('utf-8'))
+                encrypted_data = base64.b64decode(response_json.get('data', '').strip())
+                decrypted_response = decrypt_data(session_key, encrypted_data)
+                print (f"decrypted_response :: {decrypted_response}")
 
 
             else:
@@ -138,28 +161,78 @@ def decrypt_data(key, encrypted_data):
     return unpadded_data.decode('utf-8')
 
 
+def generate_key_pair():
+    priv = secrets.token_hex(32)
+    private_key = "0x" + priv
+    acct = Account.from_key(private_key)
+
+    # Get the Ethereum address from the account
+    address = acct.address
+
+    print(f"private_key: {private_key}, public_key: {address}")
+
+    return {
+        "private_key": private_key,
+        "public_key": address
+    }
+
+def generate_session_key(client_private_key):
+    # Generate a random session key for symmetric encryption (e.g., AES)
+    session_key = secrets.token_hex(16)  # 16 bytes for AES-128, adjust as needed
+
+    private_key_bytes = bytes.fromhex(client_private_key[2:])
+
+    # Sign the message
+    signed_message = messages.encode_defunct(text=session_key)
+    signature = Account.sign_message(signed_message, private_key_bytes)
+
+    return {
+        "session_key": session_key,
+        "signature": signature.signature.hex()
+    }
+
+
 if __name__ == "__main__":
     # Test creating an account
-    send_request('create_account', {'username': 'testuser133', 'password': 'testpassword133'})
+    send_request('create_account', {'username': 'testuser17', 'password': 'testpassword17','role':'student'})
 
     # Test login
-    login_response = send_request('login', {'username': 'testuser133', 'password': 'testpassword133'})
+    login_response = send_request('login', {'username': 'testuser17', 'password': 'testpassword17'})
     # print(f"Received Complete login Response: {login_response}")
 
     jwt_token = login_response.get('jwt_token','')
-    # add_national_id_response = send_request('add_national_id', {'jwt_token': jwt_token, 'national_id': '12345678911','user_id': "1"})
+    add_national_id_response = send_request('add_national_id', {'jwt_token': jwt_token, 'national_id': '12345678911','user_id': "3"})
     get_user_data_response = send_request ('get_user_data', {'jwt_token':jwt_token})
-    # print(f'thisss is the user data: {get_user_data_response}')
     user_id = get_user_data_response.get('user_id','')
     national_id = get_user_data_response.get('national_id','')
     # Test complete_user_data
-    complete_user_data_response= send_request('complete_user_data', {
-        'user_id': user_id,
-        'phone_number': '1233234435',
-        'mobile_number': '1241421',
-        'address': 'barzeh',
-        'national_id': national_id,
-        'jwt_token': jwt_token
-    },jwt_token)
+    # complete_user_data_response= send_request('complete_user_data', {
+    #     'user_id': user_id,
+    #     'phone_number': '1233234435',
+    #     'mobile_number': '1241421',
+    #     'address': 'barzeh',
+    #     'national_id': national_id,
+    #     'jwt_token': jwt_token
+    # },jwt_token)
 
-    print(f"Received Complete User Data Response: {complete_user_data_response}")
+    # print(f"Received Complete User Data Response: {complete_user_data_response}")
+
+    keys_info =generate_key_pair()
+
+    # Generate a session key and signature
+    session_key_info = generate_session_key(keys_info["private_key"])
+    session_key = session_key_info["session_key"]
+    print(f"session_key:: {session_key}")
+    signature = session_key_info["signature"]
+    print(f"signature:: {signature}")
+
+    # Handshake with the server
+    handshake_response = send_request('handshake', {'public_key': keys_info["public_key"],'user_id': user_id,'session_key': session_key, 'signature': signature},jwt_token)
+    server_public_key = handshake_response.get('server_public_key', None)
+    print(f"server_public_key: {server_public_key}")
+
+    project_descriptions = ['Project 1: Description', 'Project 2: Description', 'Project 3: Description']
+    action = 'project_descriptions'
+    data = {'jwt_token': jwt_token,'user_id':user_id,'session_key':session_key, 'project_descriptions': project_descriptions}
+    send_request(action, data, jwt_token,session_key)
+

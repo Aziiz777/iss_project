@@ -51,3 +51,46 @@ def decrypt_data(key, encrypted_data):
 
 
     return unpadded_data.decode('utf-8')
+
+
+
+def encrypt_message(key, message):
+    # Generate a random IV (Initialization Vector)
+    iv = os.urandom(16)
+
+    # Create a cipher object
+    cipher = Cipher(algorithms.AES(key), modes.CFB(iv), backend=default_backend())
+
+    # Get a encryptor object
+    encryptor = cipher.encryptor()
+
+    # Pad the message
+    padder = padding.PKCS7(algorithms.AES.block_size).padder()
+    padded_data = padder.update(message.encode('utf-8')) + padder.finalize()
+
+    # Encrypt the padded data
+    ciphertext = encryptor.update(padded_data) + encryptor.finalize()
+
+    # Return IV and ciphertext
+    return iv + ciphertext
+
+def decrypt_message(key, data):
+    # Extract IV from the data
+    iv = data[:16]
+    ciphertext = data[16:]
+
+    # Create a cipher object
+    cipher = Cipher(algorithms.AES(key), modes.CFB(iv), backend=default_backend())
+
+    # Get a decryptor object
+    decryptor = cipher.decryptor()
+
+    # Decrypt the ciphertext
+    decrypted_data = decryptor.update(ciphertext) + decryptor.finalize()
+
+    # Unpad the decrypted data
+    unpadder = padding.PKCS7(algorithms.AES.block_size).unpadder()
+    unpadded_data = unpadder.update(decrypted_data) + unpadder.finalize()
+
+    # Return the decrypted message
+    return unpadded_data.decode('utf-8')
