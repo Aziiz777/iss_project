@@ -11,7 +11,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives import padding
 
-def send_request(action, data,jwt_token=None,session_key=None):
+def send_request(action, data,jwt_token=None,):
     host = '127.0.0.1'
     port = 12345
 
@@ -60,8 +60,19 @@ def send_request(action, data,jwt_token=None,session_key=None):
             # Send the length of the data after sending the JSON
             length = len(request_json)
             client_socket.send(str(length).encode('utf-8').ljust(16))
-            
-            
+        elif action == 'send_marks':
+            session_key = data['session_key']
+            encrypted_data = encrypt_data(session_key,json.dumps(request_data['data']))
+            encrypted_data_base64 = base64.b64encode(encrypted_data).decode('utf-8')
+            request_data['data'] = encrypted_data_base64
+            print(f"The request_data is: {request_data}")
+            request_json = json.dumps(request_data)
+            client_socket.send(request_json.encode('utf-8'))
+
+            # Send the length of the data after sending the JSON
+            length = len(request_json)
+            client_socket.send(str(length).encode('utf-8').ljust(16))
+
         else:
             request_json = json.dumps(request_data)
             client_socket.send(request_json.encode('utf-8'))
@@ -194,10 +205,10 @@ def generate_session_key(client_private_key):
 
 if __name__ == "__main__":
     # Test creating an account
-    send_request('create_account', {'username': 'testuser17', 'password': 'testpassword17','role':'student'})
+    send_request('create_account', {'username': 'testuserProfessor', 'password': 'testpasswordProfessor','role':'professor'})
 
     # Test login
-    login_response = send_request('login', {'username': 'testuser17', 'password': 'testpassword17'})
+    login_response = send_request('login', {'username': 'testuserProfessor', 'password': 'testpasswordProfessor'})
     # print(f"Received Complete login Response: {login_response}")
 
     jwt_token = login_response.get('jwt_token','')
@@ -231,8 +242,50 @@ if __name__ == "__main__":
     server_public_key = handshake_response.get('server_public_key', None)
     print(f"server_public_key: {server_public_key}")
 
-    project_descriptions = ['Project 1: Description', 'Project 2: Description', 'Project 3: Description']
-    action = 'project_descriptions'
-    data = {'jwt_token': jwt_token,'user_id':user_id,'session_key':session_key, 'project_descriptions': project_descriptions}
-    send_request(action, data, jwt_token,session_key)
+    # project_descriptions = ['Project 1: Description', 'Project 2: Description', 'Project 3: Description']
+    # action = 'project_descriptions'
+    # data = {'jwt_token': jwt_token,'user_id':user_id,'session_key':session_key, 'project_descriptions': project_descriptions}
+    # send_request(action, data, jwt_token,session_key)
+
+    get_all_project_response = send_request ('get_all_project_descriptions',{'jwt_token':jwt_token})
+    print(get_all_project_response)
+
+    # Assuming the response structure
+    response = {
+    'status': 'success',
+    'project_descriptions': {
+        '1': {'user_id': 1, 'username': 'testuser17', 'project_descriptions': ['Project 1: Description', 'Project 2: Description', 'Project 3: Description']},
+        '2': {'user_id': 2, 'username': 'testuser173', 'project_descriptions': ['Project 1: Description', 'Project 2: Description', 'Project 3: Description']}
+    }
+    }
+
+    student_id = 1
+    project_id = 1
+
+    # Get the project descriptions for the specific user and project
+    user_projects = get_all_project_response.get('project_descriptions', {})
+    project_description = user_projects.get(str(student_id), {}).get('project_descriptions', [])[project_id - 1]
+    client_private_key = keys_info["private_key"]
+    private_key_bytes = bytes.fromhex(client_private_key[2:])
+
+    # Example marks data
+    marks_data = {
+        'student_id': student_id,
+        'professor_id':user_id,
+        'project_id': project_id,
+        'mark': 90,
+    }
+    
+    # Encode marks_data to a string
+    marks_data_str = json.dumps(marks_data, sort_keys=True)
+    signed_message = messages.encode_defunct(text=marks_data_str)
+
+    # Sign the message
+    signature = Account.sign_message(signed_message, private_key_bytes)
+
+    # Send marks for the specific project
+    send_request('send_marks', {'jwt_token': jwt_token,'marks_data_signature':signature.signature.hex(), 'marks_data': marks_data,'session_key':session_key},jwt_token)
+    
+
+
 

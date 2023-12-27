@@ -1,11 +1,14 @@
 # database/auth_operations.py
-from database.models import User,Student,Professor,UniversityAuthority
+from database.models import User,Student,Professor,UniversityAuthority, Mark
 import hashlib
 import jwt
+import json
+
 from datetime import datetime, timedelta
 from eth_account import Account,messages
 from web3 import Web3
 from hexbytes import HexBytes
+from sqlalchemy.orm import joinedload,load_only
 
 
 
@@ -97,7 +100,8 @@ def get_user_data(session, jwt_token):
                 'message' : 'User data retrieved successfully',
                 'user_id': user.id,
                 'national_id': user.national_id,
-                'session_key': user.session_key
+                'session_key': user.session_key,
+                'public_key': user.public_key
             }
             return user_data
         else:
@@ -160,6 +164,7 @@ def handShaking(session,client_public_key,session_key,signature,user_id,jwt_toke
                 print(f"address : {address}")
                 if address ==client_public_key:
                     user.session_key = session_key
+                    # user.session_key_signature= signature
                     session.commit()
                     print(f"signature if statements")
                     if server_public_key:
@@ -188,9 +193,9 @@ def add_project_descriptions(session, jwt_token,user_id, project_descriptions):
         print("no error3")
         if str(user_id) == str(user_id_from_token):
             print("no error4")
-            student  = session.query(User).filter(User.id == user_id_from_token, User.jwt_token == jwt_token).first()
+            student = session.query(Student).filter(Student.id == user_id_from_token, Student.jwt_token == jwt_token).first()
             print("no error5")
-            if student:  # Check if the user is a Student
+            if student:
                 print("no error6")
                 # Update the project_descriptions field
                 student.project_descriptions = project_descriptions
@@ -203,6 +208,80 @@ def add_project_descriptions(session, jwt_token,user_id, project_descriptions):
             else:
                 return {'status': 'error', 'message': 'User is not a student'}
 
+    except jwt.ExpiredSignatureError:
+        return {'status': 'error', 'message': 'JWT token has expired'}
+    except jwt.InvalidTokenError:
+        return {'status': 'error', 'message': 'Invalid JWT token'}
+
+
+def get_all_project_descriptions(session):
+    try:
+        students = session.query(Student).all()
+
+        project_descriptions = {}
+        print(f"sudentsss : {students[0].project_descriptions}")
+
+        for student in students:
+            user_data = {
+                'user_id': student.id,
+                'username': student.username,
+                'project_descriptions':  student.project_descriptions
+            }
+
+            project_descriptions[student.id] = user_data
+
+        return {'status': 'success', 'project_descriptions': project_descriptions}
+
+    except Exception as e:
+        print(f"Error fetching project descriptions: {e}")
+        return {'status': 'error', 'message': 'Error fetching project descriptions'}
+
+
+# professor_id,user_id,project_id,mark
+def send_marks(session, jwt_token,client_public_key,data_signature,data):
+    try:
+        student_id = data['student_id']
+        professor_id = data['professor_id'] 
+        project_id = data['project_id']
+        mark = data['mark']
+
+        payload = jwt.decode(jwt_token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id_from_token = int(payload.get("sub"))
+        print('no error 1')
+
+        if str(professor_id) == str(user_id_from_token):
+            print('no error 2')
+
+            w3 = Web3(Web3.HTTPProvider(""))
+            print('no error 3')
+
+            address = w3.eth.account.recover_message(messages.encode_defunct(text=json.dumps(data, sort_keys=True)),signature=HexBytes(data_signature))
+            print('no error 4')
+            student = session.query(Student).filter(Student.id == student_id).first()
+
+            if student:
+                # Check if the project_id is valid
+                if 1 <= project_id <= len(student.project_descriptions):
+                    # Create a new Mark entry
+                    new_mark = Mark(
+                        professor_id=professor_id,  # Set this based on your application logic
+                        student_id=student_id,
+                        project_description=student.project_descriptions[project_id - 1],
+                        mark=mark,
+                        signature=data_signature
+                    )
+
+                    # Add the new Mark entry to the database
+                    session.add(new_mark)
+                    session.commit()
+
+                    return {'status': 'success', 'message': 'Marks sent successfully'}
+                else:
+                    return {'status': 'error', 'message': 'Invalid project_id'}
+            else:
+                return {'status': 'error', 'message': 'User is not a student'}
+        else:
+            return {'status': 'error', 'message': 'Invalid JWT token'}
     except jwt.ExpiredSignatureError:
         return {'status': 'error', 'message': 'JWT token has expired'}
     except jwt.InvalidTokenError:

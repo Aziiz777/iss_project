@@ -1,5 +1,6 @@
 from sqlalchemy import Column, Integer, String, Boolean, create_engine,ForeignKey, JSON
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import relationship
 
 Base = declarative_base()
 
@@ -21,16 +22,31 @@ class Student(User):
     __tablename__ = 'students'
 
     id = Column(Integer, ForeignKey('users.id'), primary_key=True)
-    project_descriptions = Column(JSON)  # Use JSON or JSONB based on your database type
+    project_descriptions = Column(JSON) 
+    marks = relationship("Mark", back_populates="student")
 
 class Professor(User):
     __tablename__ = 'professors'
 
     id = Column(Integer, ForeignKey('users.id'), primary_key=True)
-    research_area = Column(String(255))
+    marks = relationship("Mark", back_populates="professor")
 
 class UniversityAuthority(User):
     __tablename__ = 'university_authorities'
 
     id = Column(Integer, ForeignKey('users.id'), primary_key=True)
     department = Column(String(100))
+
+class Mark(Base):
+    __tablename__ = 'marks'
+
+    id = Column(Integer, primary_key=True)
+    professor_id = Column(Integer, ForeignKey('professors.id'))
+    student_id = Column(Integer, ForeignKey('students.id'))
+    project_description = Column(String(255))
+    mark = Column(Integer)
+    signature = Column(String(512))  # Store the signature for the mark
+
+    # Define relationships
+    professor = relationship("Professor", back_populates="marks")
+    student = relationship("Student", back_populates="marks")

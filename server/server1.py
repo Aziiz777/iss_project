@@ -8,7 +8,7 @@ from eth_account import Account
 import pickle
 from database.db_manager import create_session
 from database.models import User
-from database.db_operations import create_account,login,complete_user_data,add_national_id,get_user_data,handShaking,add_project_descriptions
+from database.db_operations import create_account,login,complete_user_data,add_national_id,get_user_data,get_all_project_descriptions,handShaking,add_project_descriptions,send_marks
 from symmetric_encryption import encrypt_data,decrypt_data,encrypt_message,decrypt_message
 
 
@@ -57,6 +57,8 @@ def handle_client(client_socket, session,server_public_key=None):
         elif request_json['action'] == 'get_user_data':
             jwt_token = request_json['data']['jwt_token']
             get_user_data_handler(client_socket,session,jwt_token)
+        elif request_json['action'] == 'get_all_project_descriptions':
+            get_all_project_descriptions_handler(client_socket,session)
         # else
         #  here we should decrypt the request to get the action and the data 
 
@@ -82,23 +84,25 @@ def handle_client(client_socket, session,server_public_key=None):
 
             complete_user_data_handler(client_socket, session, user_id, phone_number, mobile_number, address, national_id, jwt_token)
         elif request_json['action'] == 'project_descriptions':
-            # print('entered the action block1')
             user_data = get_user_data(session, jwt_token)
-            # print('entered the action block2')
             encrypted_request_data = base64.b64decode(request_json['data'])
-            # print(f"here is the encrypted_request_data  {encrypted_request_data}")
             decrypted_request_data = decrypt_data(user_data['session_key'], encrypted_request_data)
-            # print('entered the action block3')
             decrypted_request_json = json.loads(decrypted_request_data)
-            # print('entered the action block4')
-
             user_id = decrypted_request_json['user_id']
             project_descriptions = decrypted_request_json['project_descriptions']
             jwt_token = decrypted_request_json['jwt_token']
-            # print(' the action block')
-
-
             project_descriptions_handler(client_socket, session, user_id,project_descriptions,user_data['session_key'], jwt_token)
+        elif request_json['action'] == 'send_marks':
+            user_data = get_user_data(session, jwt_token)
+            client_public_key= user_data['public_key']
+            session_key = user_data['session_key']
+            encrypted_request_data = base64.b64decode(request_json['data'])
+            decrypted_request_data = decrypt_data(session_key, encrypted_request_data)
+            decrypted_request_json = json.loads(decrypted_request_data)
+            marks_data = decrypted_request_json['marks_data']
+            marks_data_signature = decrypted_request_json['marks_data_signature']
+            jwt_token = decrypted_request_json['jwt_token']
+            send_marks_handler(client_socket, session,jwt_token,client_public_key,marks_data_signature,marks_data)
 
         else:
             send_response(client_socket, {'status': 'error', 'message': 'Invalid action'})
@@ -129,6 +133,10 @@ def get_user_data_handler(client_socket, session, jwt_token):
     response_data = get_user_data(session, jwt_token)
     send_response(client_socket, response_data)
 
+def get_all_project_descriptions_handler(client_socket,session):
+    response_data = get_all_project_descriptions(session)
+    send_response(client_socket,response_data)
+
 def complete_user_data_handler(client_socket, session, user_id, phone_number, mobile_number, address, national_id, jwt_token):
     try:
         response_data = complete_user_data(
@@ -142,14 +150,10 @@ def complete_user_data_handler(client_socket, session, user_id, phone_number, mo
         )
         response_json = json.dumps(response_data)
         print(f'data raw::: {response_data}')
-
-
         encrypted_response_data = encrypt_data(national_id, response_json)
-
         # Convert bytes to base64 before sending
         encrypted_response_base64 = base64.b64encode(encrypted_response_data).decode('utf-8')
         print(f"error ::: {encrypted_response_base64}")
-
         send_response(client_socket, {'data': encrypted_response_base64})
         print("error here 4")
 
@@ -186,21 +190,22 @@ def project_descriptions_handler(client_socket, session, user_id, project_descri
         print(f"Error handling complete_user_data request: {e}")
         send_response(client_socket, {'status': 'error', 'message': 'Server error'})
 
+def send_marks_handler(client_socket,session, jwt_token,client_public_key,marks_data_signature,marks_data):
+    response_data = send_marks(session, jwt_token,client_public_key,marks_data_signature,marks_data)
+    send_response(client_socket,response_data)
 
 def send_response(client_socket, response_data):
     try:
 
         response_data = json.dumps(response_data)
-
-        
         length = str(len(response_data)).ljust(16)
-
         if client_socket.fileno() != -1:
             # Socket is open, proceed with sending data
             print(f"send length : {length.encode('utf-8')}")
             client_socket.send(length.encode('utf-8'))
             print(f"send data : {response_data.encode('utf-8')}")
             client_socket.send(response_data.encode('utf-8'))
+            print(f"send data : {response_data.encode('utf-8')}")
         else:
             # Socket is closed, handle accordingly
             print("Socket is closed.")
