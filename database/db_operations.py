@@ -62,7 +62,7 @@ def login(session, username, password):
         jwt_token = create_jwt_token(jwt_data)
         user.jwt_token = jwt_token
         session.commit()
-        return {'status': 'success', 'message': 'Login successful', 'jwt_token': user.jwt_token}
+        return {'status': 'success', 'message': 'Login successful', 'jwt_token': user.jwt_token,'user_id': user.id}
     else:
         return {'status': 'error', 'message': 'Invalid username or password'}
 
@@ -341,14 +341,12 @@ def store_csr(session, jwt_token, user_id, csr_pem):
 
 
 # Function to store a certificate for the user
-def store_certificate(session, client_name: str,ca_name):
+def store_certificate(session, client_name: str,ca_name,certificate_data: str):
     try:
         # Retrieve the user by username
         print(1)
         user = session.query(User).filter(User.username == client_name).first()
         print(2)
-
-
         if user:
             print(3)
 
@@ -371,7 +369,8 @@ def store_certificate(session, client_name: str,ca_name):
                     user_id=user.id,
                     public_key=user.public_key if user.public_key else "",
                     expiration_date=datetime.utcnow() + timedelta(days=365),
-                    ca_id=ca.id  # Associate the certificate with the CertificateAuthority
+                    ca_id=ca.id ,
+                    certificate_data = certificate_data
                 )
                 print(6)
 
@@ -380,7 +379,7 @@ def store_certificate(session, client_name: str,ca_name):
                 session.add(certificate)
                 session.commit()
 
-                return {'status': 'success', 'message': 'Certificate created successfully'}
+                return {'status': 'success', 'message': 'Certificate created successfully', 'certificate_data':certificate_data}
             else:
                 return {'status': 'error', 'message': 'User does not have a CSR'}
         else:

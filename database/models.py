@@ -66,6 +66,7 @@ class Certificate(Base):
     user_id = Column(Integer, ForeignKey('users.id'))
     public_key = Column(String(512), unique=True)
     expiration_date = Column(DateTime)
+    certificate_data = Column(String)
     
     # Update this line to specify the foreign key relationship
     ca_id = Column(Integer, ForeignKey('certificate_authorities.id'))

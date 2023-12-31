@@ -45,6 +45,25 @@ def handle_client(client_socket, session,server_public_key=None):
                 jwt_token = headers['Authorization']
                 # Extract the token part from the Authorization header
                 # _, jwt_token = auth_header.split(' ', 1)
+
+        if 'certificate' in request_json: 
+            print('enter')
+            certificate = request_json['certificate']
+            print('enter1')
+            ca_data = get_ca_data(session,jwt_token,"name")
+            print('erorororor')
+            ca_pub_key = ca_data['public_key']
+            # certificate_info = retrieve_certificate_info(certificate)
+            # print('enter2')
+            # ca_pub_key = certificate_info['public_key']
+            print(ca_pub_key)
+            response_data =  verify_client_certificate(certificate,ca_pub_key)
+            print(response_data)
+            if response_data['status'] =='error':
+                send_response(client_socket,response_data)
+            print('enter3')
+
+
         if request_json['action'] == 'handshake':
             client_public_key= request_json['data']['public_key']
             session_key = request_json['data']['session_key']
@@ -116,7 +135,7 @@ def handle_client(client_socket, session,server_public_key=None):
             marks_data = decrypted_request_json['marks_data']
             marks_data_signature = decrypted_request_json['marks_data_signature']
             jwt_token = decrypted_request_json['jwt_token']
-            send_marks_handler(client_socket, session,jwt_token,client_public_key,marks_data_signature,marks_data)
+            send_marks_handler(client_socket, session,jwt_token,client_public_key,marks_data_signature,marks_data,session_key)
         elif request_json['action'] == 'send_csr': 
             user_data = get_user_data(session, jwt_token)
             session_key = user_data['session_key']
@@ -126,7 +145,7 @@ def handle_client(client_socket, session,server_public_key=None):
             decrypted_request_json = json.loads(decrypted_request_data)
             professor_csr = decrypted_request_json['professor_csr']
             jwt_token = decrypted_request_json['jwt_token']
-            send_csr_handler(client_socket,session,jwt_token,user_id,professor_csr)
+            send_csr_handler(client_socket,session,jwt_token,user_id,professor_csr,session_key)
         elif request_json['action'] == 'sign_csr':
             jwt_token = request_json['data']['jwt_token']
             ca_username = request_json['data']['ca_username']
@@ -189,12 +208,10 @@ def complete_user_data_handler(client_socket, session, user_id, phone_number, mo
         response_json = json.dumps(response_data)
         print(f'data raw::: {response_data}')
         encrypted_response_data = encrypt_data(national_id, response_json)
-        # Convert bytes to base64 before sending
         encrypted_response_base64 = base64.b64encode(encrypted_response_data).decode('utf-8')
         print(f"error ::: {encrypted_response_base64}")
         send_response(client_socket, {'data': encrypted_response_base64})
         print("error here 4")
-
     except Exception as e:
         print(f"Error handling complete_user_data request: {e}")
         send_response(client_socket, {'status': 'error', 'message': 'Server error'})
@@ -213,36 +230,35 @@ def project_descriptions_handler(client_socket, session, user_id, project_descri
         )
         response_json = json.dumps(response_data)
         print(f'data raw::: {response_data}')
-
-
         encrypted_response_data = encrypt_data(session_key, response_json)
-
-        # Convert bytes to base64 before sending
         encrypted_response_base64 = base64.b64encode(encrypted_response_data).decode('utf-8')
         print(f"error ::: {encrypted_response_base64}")
-
         send_response(client_socket, {'data': encrypted_response_base64})
         print("error here 4")
-
     except Exception as e:
         print(f"Error handling complete_user_data request: {e}")
         send_response(client_socket, {'status': 'error', 'message': 'Server error'})
 
-def send_marks_handler(client_socket,session, jwt_token,client_public_key,marks_data_signature,marks_data):
+def send_marks_handler(client_socket,session, jwt_token,client_public_key,marks_data_signature,marks_data,session_key):
     response_data = send_marks(session, jwt_token,client_public_key,marks_data_signature,marks_data)
-    send_response(client_socket,response_data)
+    response_json = json.dumps(response_data)
+    encrypted_response_data = encrypt_data(session_key, response_json)
+    encrypted_response_base64 = base64.b64encode(encrypted_response_data).decode('utf-8')
+    send_response(client_socket, {'data': encrypted_response_base64})
+    # send_response(client_socket,response_data)
 
-def send_csr_handler(client_socket,session,jwt_token,user_id,professor_csr):
+def send_csr_handler(client_socket,session,jwt_token,user_id,professor_csr,session_key):
     response_data = store_csr(session, jwt_token,user_id, professor_csr)
-    send_response(client_socket,response_data)
+    response_json = json.dumps(response_data)
+    encrypted_response_data = encrypt_data(session_key, response_json)
+    encrypted_response_base64 = base64.b64encode(encrypted_response_data).decode('utf-8')
+    send_response(client_socket, {'data': encrypted_response_base64})
+    # send_response(client_socket,response_data)
 
 def store_certificate_handler(client_socket,session, certificate):
     print("nooooo error ")
     certificate_info = retrieve_certificate_info(certificate)
-    print("nooooo error ")
-    print(certificate_info['subject'].get_attributes_for_oid(NameOID.COMMON_NAME)[0].value)
-    print(certificate_info['issuer'].get_attributes_for_oid(NameOID.COMMON_NAME)[0].value)
-    response_data = store_certificate(session , certificate_info['subject'].get_attributes_for_oid(NameOID.COMMON_NAME)[0].value,certificate_info['issuer'].get_attributes_for_oid(NameOID.COMMON_NAME)[0].value)
+    response_data = store_certificate(session , certificate_info['subject'].get_attributes_for_oid(NameOID.COMMON_NAME)[0].value,certificate_info['issuer'].get_attributes_for_oid(NameOID.COMMON_NAME)[0].value,certificate)
     print("nooooo error ")
     send_response(client_socket,response_data)
 
@@ -252,14 +268,12 @@ def send_response(client_socket, response_data):
         response_data = json.dumps(response_data)
         length = str(len(response_data)).ljust(16)
         if client_socket.fileno() != -1:
-            # Socket is open, proceed with sending data
             print(f"send length : {length.encode('utf-8')}")
             client_socket.send(length.encode('utf-8'))
             print(f"send data : {response_data.encode('utf-8')}")
             client_socket.send(response_data.encode('utf-8'))
             print(f"send data : {response_data.encode('utf-8')}")
         else:
-            # Socket is closed, handle accordingly
             print("Socket is closed.")
     except ConnectionAbortedError:
         print("Connection aborted by the client.")
@@ -392,28 +406,54 @@ def sign_csr(csr_pem, ca_private_key_pem, ca_name):
     return certificate_pem.decode()
 
 
-def validate_csr(csr_pem, ca_public_key):
+# def validate_csr(csr_pem, ca_public_key):
+#     try:
+#         print("aaaa")
+#         # Load CSR from PEM format
+#         csr = x509.load_pem_x509_csr(csr_pem, default_backend())
+#         hash_algorithm = hashes.SHA256()
+#         print("aaaaa")
+#         tbs_bytes = csr.tbs_certrequest_bytes
+
+
+#         # Use tbs_certrequest_bytes instead of tbs_certificate_bytes
+#         print("aaaaa4")
+
+#         ca_public_key.verify(
+#             csr.signature,
+#             tbs_bytes,
+#             ec.ECDSA(hash_algorithm)
+#         )
+#         print("aaaaa5")
+
+#     except Exception as e:
+#         raise ValueError("CSR signature validation failed") from e
+
+def verify_client_certificate(client_certificate_pem, ca_public_key_pem):
     try:
-        print("aaaa")
-        # Load CSR from PEM format
-        csr = x509.load_pem_x509_csr(csr_pem, default_backend())
-        hash_algorithm = hashes.SHA256()
-        print("aaaaa")
-        tbs_bytes = csr.tbs_certrequest_bytes
+        # Load the CA's public key
+        ca_public_key = serialization.load_pem_public_key(ca_public_key_pem.encode(), backend=default_backend())
 
+        # Load the client's certificate
+        pem_data = client_certificate_pem.encode('utf-8')
+        certificate = x509.load_pem_x509_certificate(pem_data, default_backend())
 
-        # Use tbs_certrequest_bytes instead of tbs_certificate_bytes
-        print("aaaaa4")
+        # Extract the signature and TBS bytes from the certificate
+        signature = certificate.signature
+        tbs_certificate_bytes = certificate.tbs_certificate_bytes
 
+        # Validate the client's certificate against the CA's public key
         ca_public_key.verify(
-            csr.signature,
-            tbs_bytes,
-            ec.ECDSA(hash_algorithm)
+            signature,
+            tbs_certificate_bytes,
+            ec.ECDSA(hashes.SHA256())
         )
-        print("aaaaa5")
+        return {'status': 'success', 'message': 'Client certificate verification successful'}
 
     except Exception as e:
-        raise ValueError("CSR signature validation failed") from e
+        print(f"Error verifying client certificate: {e}")
+        return {'status': 'error', 'message': 'Client certificate verification failed'}
+
 
 def retrieve_certificate_info(certificate_pem):
     # Load the certificate
