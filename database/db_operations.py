@@ -56,7 +56,7 @@ def login(session, username, password):
         jwt_token = create_jwt_token(jwt_data)
         user.jwt_token = jwt_token
         session.commit()
-        return {'status': 'success', 'message': 'Login successful', 'jwt_token': user.jwt_token}
+        return {'status': 'success', 'message': 'Login successful', 'jwt_token': user.jwt_token, 'user_id': user.id}
     else:
         return {'status': 'error', 'message': 'Invalid username or password'}
 
