@@ -34,12 +34,12 @@ class Login(tk.Frame):
         login_button.pack(pady=[30, 10], ipady=2, ipadx=10)
 
         # Back button
-        signup_button = tk.Button(
+        back_button = tk.Button(
             self, 
             text="Back", 
             command=self.back
             )
-        signup_button.pack(pady=10, ipady=2, ipadx=10)
+        back_button.pack(pady=10, ipady=2, ipadx=10)
     
     def login_handler(self):
         

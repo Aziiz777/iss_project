@@ -204,7 +204,6 @@ def generate_session_key(client_private_key):
 
 def execute():
     # Test creating an account
-    print("CCCcCCCCCcccCCcccCcccCCCCccccCCcccC")
     send_request('create_account', {'username': 'testuserProfessor', 'password': 'testpasswordProfessor','role':'professor'})
 
     # Test login

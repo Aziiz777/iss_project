@@ -36,12 +36,12 @@ def create_account(session, username, password,role,**kwargs):
         return {'status': 'error', 'message': 'Username already exists'}
     else:
                 # Create a new user account based on the specified role
-        if role == 'student':
+        if role.lower() == 'student' :
             new_user = Student(username=username, password=hash_password(password), **kwargs)
             
-        elif role == 'professor':
+        elif role.lower() == 'professor':
             new_user = Professor(username=username, password=hash_password(password), **kwargs)
-        elif role == 'university_authority':
+        elif role.lower() == 'university_authority':
             new_user = UniversityAuthority(username=username, password=hash_password(password), **kwargs)
         # Create a new user account
         # new_user = User(username=username, password=hash_password(password))
