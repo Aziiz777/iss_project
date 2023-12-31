@@ -1,5 +1,6 @@
 import tkinter as tk
 import tkinter.messagebox as messagebox
+from screens.complete_data import CompleteData
 from client import send_request
 
 class NationalId(tk.Frame):
@@ -36,7 +37,10 @@ class NationalId(tk.Frame):
         messagebox.showinfo("Response", message)
 
         if response['status'].lower() == 'success':
-            self.next_page()
+            self.next_page(user_id, token, national_id)
     
-    def next_page(self):
-        print('next page')
+    def next_page(self, user_id, token, national_id):
+        self.pack_forget()
+
+        complete_data_frame = CompleteData(self.master, user_id, token, national_id)
+        complete_data_frame.pack()
