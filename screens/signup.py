@@ -32,11 +32,7 @@ class SignUp(tk.Frame):
             )
         signup_button.pack(pady=[30, 10], ipady=2, ipadx=10)
 
-        # Divider
-        label2 = tk.Label(self, text="Or", font=("Arial", 10))
-        label2.pack()
-
-        # Sign Up button
+        # Back button
         login_button = tk.Button(
             self, 
             text="Back", 

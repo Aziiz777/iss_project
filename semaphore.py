@@ -25,7 +25,7 @@ class Thread1(threading.Thread):
         print("Thread 1 started")
         
         init_db()
-        # start_server()
+        start_server()
 
         # Acquire the semaphore to signal that Thread 1 is ready
         semaphore.acquire()

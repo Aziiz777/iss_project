@@ -201,11 +201,10 @@ def send_response(client_socket, response_data):
         length = str(len(response_data)).ljust(16)
         if client_socket.fileno() != -1:
             # Socket is open, proceed with sending data
-            print(f"send length : {length.encode('utf-8')}")
+            # print(f"send length : {length.encode('utf-8')}")
             client_socket.send(length.encode('utf-8'))
-            print(f"send data : {response_data.encode('utf-8')}")
+            # print(f"send data : {response_data.encode('utf-8')}")
             client_socket.send(response_data.encode('utf-8'))
-            print(f"send data : {response_data.encode('utf-8')}")
         else:
             # Socket is closed, handle accordingly
             print("Socket is closed.")
@@ -256,37 +255,25 @@ def start_server():
     
     # Create a new thread for handling the third task
 
-    global server_running
-    server_running = True
-    threads = []
-
-    while server_running:
-        try:
+    try:
+        while True:
             client_socket, addr = server_socket.accept()
             print(f"Accepted connection from {addr}")
 
             # Start a new thread for each client
             client_thread = threading.Thread(target=handle_client, args=(client_socket, create_session(),keys_info["public_key"]))
-            threads.append(client_thread)
             client_thread.start()
 
-        except KeyboardInterrupt:
-            print("Server shutting down.")
-            server_running = False
-            break
+    except KeyboardInterrupt:
+        print("Server shutting down.")
+        
 
-        except ConnectionAbortedError:
-            print(f"Connection aborted by the client.")
+    except ConnectionAbortedError:
+        print(f"Connection aborted by the client.")
 
-        finally:
-            server_socket.close()
+    finally:
+        server_socket.close()
 
-# def shutdown_server(): 
-#     print("inside shutdown")   
-#     global server_running
-#     server_running = False
-
-# atexit.register(shutdown_server)
 
 if __name__ == "semaphore":
     start_server()

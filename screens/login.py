@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import messagebox
+from client import send_request
 
 class Login(tk.Frame):
     def __init__(self, master, show_main):
@@ -32,11 +33,7 @@ class Login(tk.Frame):
             )
         login_button.pack(pady=[30, 10], ipady=2, ipadx=10)
 
-        # Divider
-        label2 = tk.Label(self, text="Or", font=("Arial", 10))
-        label2.pack()
-
-        # Sign Up button
+        # Back button
         signup_button = tk.Button(
             self, 
             text="Back", 
@@ -45,15 +42,23 @@ class Login(tk.Frame):
         signup_button.pack(pady=10, ipady=2, ipadx=10)
     
     def login_handler(self):
-        # Retrieve values from entry fields in the Login tab
+        
         username = self.username_entry.get()
         password = self.password_entry.get()
 
-        # Placeholder for actual login code
-        response = f"Logging in with {username}"
+        
+        response = send_request(
+            "login", 
+            {
+                'username': username,
+                'password': password
+            }
+            )
 
+        message = response['message']
+    
         # Display response using a messagebox
-        messagebox.showinfo("Response", response)
+        messagebox.showinfo("Response", message)
     
     def back(self):
         self.destroy()        
