@@ -1,7 +1,7 @@
 import threading, time
 from database.db_manager import init_db
 from server.server1 import start_server
-from client import execute
+from screens.app import start_app
 
 class Semaphore:
     def __init__(self, count):
@@ -25,14 +25,14 @@ class Thread1(threading.Thread):
         print("Thread 1 started")
         
         init_db()
-        start_server()
+        # start_server()
 
         # Acquire the semaphore to signal that Thread 1 is ready
         semaphore.acquire()
 
         # Perform the work of Thread 1
         print("Thread 1 is performing its work")
-        time.sleep(2)
+        time.sleep(0.1)
 
         # Release the semaphore to signal that Thread 1 is done
         semaphore.release()
@@ -40,8 +40,7 @@ class Thread1(threading.Thread):
 class Thread2(threading.Thread):
     def run(self):
         print("Thread 2 started")
-
-        execute()
+        start_app()
 
         # Wait for Thread 1 to signal that it is ready
         while semaphore.acquire() is False:
@@ -49,7 +48,7 @@ class Thread2(threading.Thread):
 
         # Perform the work of Thread 2
         print("Thread 2 is performing its work")
-        time.sleep(2)
+        time.sleep(0.1)
         
 def runSemaphore():
     global semaphore
