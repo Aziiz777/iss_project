@@ -11,7 +11,7 @@ from database.models import User
 from database.db_operations import create_account,login,complete_user_data,add_national_id,get_user_data,get_all_project_descriptions,handShaking,add_project_descriptions,send_marks
 from symmetric_encryption import encrypt_data,decrypt_data,encrypt_message,decrypt_message
 
-
+import time
 
 def handle_client(client_socket, session,server_public_key=None):
    
@@ -253,20 +253,40 @@ def start_server():
 
     # with open('server_public_key.pem', 'wb') as f:
     #     f.write(keys_info["public_key"].to_pem())
+    
+    # Create a new thread for handling the third task
 
-    try:
-        while True:
+    global server_running
+    server_running = True
+    threads = []
+
+    while server_running:
+        try:
             client_socket, addr = server_socket.accept()
             print(f"Accepted connection from {addr}")
 
             # Start a new thread for each client
             client_thread = threading.Thread(target=handle_client, args=(client_socket, create_session(),keys_info["public_key"]))
+            threads.append(client_thread)
             client_thread.start()
 
-    except KeyboardInterrupt:
-        print("Server shutting down.")
-    finally:
-        server_socket.close()
+        except KeyboardInterrupt:
+            print("Server shutting down.")
+            server_running = False
+            break
 
-if __name__ == "__main__":
+        except ConnectionAbortedError:
+            print(f"Connection aborted by the client.")
+
+        finally:
+            server_socket.close()
+
+# def shutdown_server(): 
+#     print("inside shutdown")   
+#     global server_running
+#     server_running = False
+
+# atexit.register(shutdown_server)
+
+if __name__ == "semaphore":
     start_server()

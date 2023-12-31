@@ -202,9 +202,9 @@ def generate_session_key(client_private_key):
         "signature": signature.signature.hex()
     }
 
-
-if __name__ == "__main__":
+def execute():
     # Test creating an account
+    print("CCCcCCCCCcccCCcccCcccCCCCccccCCcccC")
     send_request('create_account', {'username': 'testuserProfessor', 'password': 'testpasswordProfessor','role':'professor'})
 
     # Test login
@@ -285,7 +285,9 @@ if __name__ == "__main__":
 
     # Send marks for the specific project
     send_request('send_marks', {'jwt_token': jwt_token,'marks_data_signature':signature.signature.hex(), 'marks_data': marks_data,'session_key':session_key},jwt_token)
-    
 
+
+if __name__ == "semaphore":
+    execute()
 
 
