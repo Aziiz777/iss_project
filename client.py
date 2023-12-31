@@ -10,6 +10,18 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives import padding
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography import x509
+from cryptography.x509.oid import NameOID
+from datetime import datetime, timedelta
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography import x509
+from cryptography.x509.oid import NameOID
+from cryptography.hazmat.primitives.asymmetric import ec, utils
+from cryptography.hazmat.primitives import hashes, hmac
 
 def send_request(action, data,jwt_token=None,):
     host = '127.0.0.1'
@@ -72,6 +84,17 @@ def send_request(action, data,jwt_token=None,):
             # Send the length of the data after sending the JSON
             length = len(request_json)
             client_socket.send(str(length).encode('utf-8').ljust(16))
+        elif action == 'send_csr':
+            session_key = data['session_key']
+            encrypted_data =encrypt_data(session_key, json.dumps(request_data['data']))
+            encrypted_data_base64 = base64.b64encode(encrypted_data).decode('utf-8')
+            request_data['data'] = encrypted_data_base64
+            print(f"The request_data is: {request_data}")
+            request_json = json.dumps(request_data)
+            client_socket.send(request_json.encode('utf-8'))
+            length = len(request_json)
+            client_socket.send(str(length).encode('utf-8').ljust(16))
+            
 
         else:
             request_json = json.dumps(request_data)
@@ -202,6 +225,68 @@ def generate_session_key(client_private_key):
         "signature": signature.signature.hex()
     }
 
+def generate_ecdsa_key_pair():
+    # Generate a random private key
+    private_key_bytes = secrets.token_bytes(32)
+
+    # Create an EC private key object
+    private_key = ec.derive_private_key(
+        int.from_bytes(private_key_bytes, byteorder='big'),
+        ec.SECP256R1(),
+        default_backend()
+    )
+
+    # Get the corresponding public key
+    public_key = private_key.public_key()
+
+    return private_key, public_key
+
+def save_private_key_pem(private_key):
+    # Save private key (keep it secure)
+    private_key_pem = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption()
+    )
+    return private_key_pem
+
+def save_public_key_pem(public_key):
+    # Save public key
+    public_key_pem = public_key.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+    return public_key_pem
+
+
+def generate_csr(private_key_pem, common_name):
+    # Load the private key from PEM format
+    private_key = serialization.load_pem_private_key(
+        private_key_pem.encode(),
+        password=None,
+        backend=default_backend()
+    )
+
+    # Create a CSR builder
+    builder = x509.CertificateSigningRequestBuilder()
+
+    # Add subject information
+    builder = builder.subject_name(x509.Name([
+        x509.NameAttribute(NameOID.COMMON_NAME, common_name)
+    ]))
+
+    # Sign the CSR with the private key
+    csr = builder.sign(private_key, hashes.SHA256(), default_backend())
+
+    # Convert the CSR to PEM format
+    csr_pem = csr.public_bytes(encoding=serialization.Encoding.PEM)
+
+    return csr_pem.decode()
+
+def read_key_from_file(file_path):
+    with open(file_path, 'r') as key_file:
+        key_content = key_file.read()
+    return key_content
 
 if __name__ == "__main__":
     # Test creating an account
@@ -247,44 +332,62 @@ if __name__ == "__main__":
     # data = {'jwt_token': jwt_token,'user_id':user_id,'session_key':session_key, 'project_descriptions': project_descriptions}
     # send_request(action, data, jwt_token,session_key)
 
-    get_all_project_response = send_request ('get_all_project_descriptions',{'jwt_token':jwt_token})
-    print(get_all_project_response)
+    # get_all_project_response = send_request ('get_all_project_descriptions',{'jwt_token':jwt_token})
+    # print(get_all_project_response)
 
-    # Assuming the response structure
-    response = {
-    'status': 'success',
-    'project_descriptions': {
-        '1': {'user_id': 1, 'username': 'testuser17', 'project_descriptions': ['Project 1: Description', 'Project 2: Description', 'Project 3: Description']},
-        '2': {'user_id': 2, 'username': 'testuser173', 'project_descriptions': ['Project 1: Description', 'Project 2: Description', 'Project 3: Description']}
-    }
-    }
+    # # Assuming the response structure
+    # response = {
+    # 'status': 'success',
+    # 'project_descriptions': {
+    #     '1': {'user_id': 1, 'username': 'testuser17', 'project_descriptions': ['Project 1: Description', 'Project 2: Description', 'Project 3: Description']},
+    #     '2': {'user_id': 2, 'username': 'testuser173', 'project_descriptions': ['Project 1: Description', 'Project 2: Description', 'Project 3: Description']}
+    # }
+    # }
 
-    student_id = 1
-    project_id = 1
+    # student_id = 1
+    # project_id = 1
 
-    # Get the project descriptions for the specific user and project
-    user_projects = get_all_project_response.get('project_descriptions', {})
-    project_description = user_projects.get(str(student_id), {}).get('project_descriptions', [])[project_id - 1]
-    client_private_key = keys_info["private_key"]
-    private_key_bytes = bytes.fromhex(client_private_key[2:])
+    # # Get the project descriptions for the specific user and project
+    # user_projects = get_all_project_response.get('project_descriptions', {})
+    # project_description = user_projects.get(str(student_id), {}).get('project_descriptions', [])[project_id - 1]
+    # client_private_key = keys_info["private_key"]
+    # private_key_bytes = bytes.fromhex(client_private_key[2:])
 
-    # Example marks data
-    marks_data = {
-        'student_id': student_id,
-        'professor_id':user_id,
-        'project_id': project_id,
-        'mark': 90,
-    }
+    # # Example marks data
+    # marks_data = {
+    #     'student_id': student_id,
+    #     'professor_id':user_id,
+    #     'project_id': project_id,
+    #     'mark': 90,
+    # }
+
+    # # Encode marks_data to a string
+    # marks_data_str = json.dumps(marks_data, sort_keys=True)
+    # signed_message = messages.encode_defunct(text=marks_data_str)
+
+    # # Sign the message
+    # signature = Account.sign_message(signed_message, private_key_bytes)
+
+    # # Send marks for the specific project
+    # send_request('send_marks', {'jwt_token': jwt_token,'marks_data_signature':signature.signature.hex(), 'marks_data': marks_data,'session_key':session_key},jwt_token)
+
+    professor_private, professor_public = generate_ecdsa_key_pair()
+    # Save private and public keys in PEM format
+    private_key_pem = save_private_key_pem(professor_private)
+    public_key_pem = save_public_key_pem(professor_public)
+
+    # private_key_content = read_key_from_file('private_key.pem')
+    # print(private_key_content)
+    # public_key_content = read_key_from_file('public_key.pem')
     
-    # Encode marks_data to a string
-    marks_data_str = json.dumps(marks_data, sort_keys=True)
-    signed_message = messages.encode_defunct(text=marks_data_str)
+    professor_csr = generate_csr(private_key_pem.decode(),"testuserProfessor")
+    send_request('send_csr',{'jwt_token': jwt_token , 'professor_csr': professor_csr,'session_key': session_key},jwt_token)
+    login_response = send_request('login', {'username': 'name', 'password': 'caPassword'})
+    print(f"Received Complete login Response: {login_response}")
+    jwt_token = login_response.get('jwt_token','')
+    send_request('sign_csr', {'jwt_token': jwt_token ,'client_csr': professor_csr, 'client_name': 'testuserProfessor','ca_username':'name'},jwt_token)
 
-    # Sign the message
-    signature = Account.sign_message(signed_message, private_key_bytes)
 
-    # Send marks for the specific project
-    send_request('send_marks', {'jwt_token': jwt_token,'marks_data_signature':signature.signature.hex(), 'marks_data': marks_data,'session_key':session_key},jwt_token)
     
 
 

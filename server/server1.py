@@ -7,15 +7,29 @@ import secrets
 from eth_account import Account
 import pickle
 from database.db_manager import create_session
-from database.models import User
-from database.db_operations import create_account,login,complete_user_data,add_national_id,get_user_data,get_all_project_descriptions,handShaking,add_project_descriptions,send_marks
-from symmetric_encryption import encrypt_data,decrypt_data,encrypt_message,decrypt_message
+from database.models import User,CertificateAuthority
+from database.db_operations import create_account,login,complete_user_data,add_national_id,get_user_data,get_ca_data,get_all_project_descriptions,handShaking,add_project_descriptions,send_marks,store_csr,hash_password,store_certificate
+from symmetric_encryption import encrypt_data,decrypt_data
+from sqlalchemy.orm import Session
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography import x509
+from cryptography.x509.oid import NameOID
+from datetime import datetime, timedelta
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography import x509
+from cryptography.x509.oid import NameOID
+from cryptography.hazmat.primitives.asymmetric import ec, utils
+from cryptography.hazmat.primitives import hashes, hmac
+from cryptography.x509.oid import ExtensionOID
+
 
 
 
 def handle_client(client_socket, session,server_public_key=None):
    
-
     try:
         # Receive client request
         request_data = client_socket.recv(1024)
@@ -103,6 +117,32 @@ def handle_client(client_socket, session,server_public_key=None):
             marks_data_signature = decrypted_request_json['marks_data_signature']
             jwt_token = decrypted_request_json['jwt_token']
             send_marks_handler(client_socket, session,jwt_token,client_public_key,marks_data_signature,marks_data)
+        elif request_json['action'] == 'send_csr': 
+            user_data = get_user_data(session, jwt_token)
+            session_key = user_data['session_key']
+            user_id = user_data['user_id']
+            encrypted_request_data = base64.b64decode(request_json['data'])
+            decrypted_request_data = decrypt_data(session_key, encrypted_request_data)
+            decrypted_request_json = json.loads(decrypted_request_data)
+            professor_csr = decrypted_request_json['professor_csr']
+            jwt_token = decrypted_request_json['jwt_token']
+            send_csr_handler(client_socket,session,jwt_token,user_id,professor_csr)
+        elif request_json['action'] == 'sign_csr':
+            jwt_token = request_json['data']['jwt_token']
+            ca_username = request_json['data']['ca_username']
+            client_csr = request_json['data']['client_csr']
+            client_name = request_json['data']['client_name']
+            print('erorororor')
+            ca_data = get_ca_data(session,jwt_token,ca_username)
+            print('erorororor')
+            ca_public_key = ca_data['public_key']
+            print('erorororor')
+            ca_private_key = ca_data['private_key']
+            print(ca_private_key)
+            print('erorororor')
+            signed_certificate = sign_csr(client_csr,ca_private_key,ca_data['username'])
+            print('erorororor')
+            store_certificate_handler(client_socket,session,signed_certificate)
 
         else:
             send_response(client_socket, {'status': 'error', 'message': 'Invalid action'})
@@ -114,12 +154,10 @@ def handle_client(client_socket, session,server_public_key=None):
     finally:
         client_socket.close()
 
-# Function to create a new account
 def create_account_handler(client_socket, session, username, password,role):
     response_data = create_account(session, username, password,role)
     send_response(client_socket, response_data)
 
-# Function to handle login
 def login_handler(client_socket, session, username, password):
     response_data = login(session, username, password)
     send_response(client_socket, response_data)
@@ -194,6 +232,20 @@ def send_marks_handler(client_socket,session, jwt_token,client_public_key,marks_
     response_data = send_marks(session, jwt_token,client_public_key,marks_data_signature,marks_data)
     send_response(client_socket,response_data)
 
+def send_csr_handler(client_socket,session,jwt_token,user_id,professor_csr):
+    response_data = store_csr(session, jwt_token,user_id, professor_csr)
+    send_response(client_socket,response_data)
+
+def store_certificate_handler(client_socket,session, certificate):
+    print("nooooo error ")
+    certificate_info = retrieve_certificate_info(certificate)
+    print("nooooo error ")
+    print(certificate_info['subject'].get_attributes_for_oid(NameOID.COMMON_NAME)[0].value)
+    print(certificate_info['issuer'].get_attributes_for_oid(NameOID.COMMON_NAME)[0].value)
+    response_data = store_certificate(session , certificate_info['subject'].get_attributes_for_oid(NameOID.COMMON_NAME)[0].value,certificate_info['issuer'].get_attributes_for_oid(NameOID.COMMON_NAME)[0].value)
+    print("nooooo error ")
+    send_response(client_socket,response_data)
+
 def send_response(client_socket, response_data):
     try:
 
@@ -231,8 +283,190 @@ def generate_key_pair():
         "public_key": address
     }
 
+def generate_ecdsa_key_pair():
+    # Generate a random private key
+    private_key_bytes = secrets.token_bytes(32)
+
+    # Create an EC private key object
+    private_key = ec.derive_private_key(
+        int.from_bytes(private_key_bytes, byteorder='big'),
+        ec.SECP256R1(),
+        default_backend()
+    )
+
+    # Get the corresponding public key
+    public_key = private_key.public_key()
+
+    return private_key, public_key
+
+def save_private_key_pem(private_key):
+    # Save private key (keep it secure)
+    private_key_pem = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption()
+    )
+    return private_key_pem
+
+def save_public_key_pem(public_key):
+    # Save public key
+    public_key_pem = public_key.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+    return public_key_pem
+
+def create_certificate_authority(session, name,password):
+    private_key, public_key = generate_ecdsa_key_pair()
+
+    private_key_pem = save_private_key_pem(private_key)
+    public_key_pem = save_public_key_pem(public_key)
+    print(private_key_pem)
+    print(private_key_pem.decode())
+
+    # Define file paths in the current directory
+    private_key_file_path = 'private_key.pem'
+    public_key_file_path = 'public_key.pem'
+
+    with open(private_key_file_path, 'w') as private_key_file:
+        private_key_file.write(private_key_pem.decode())
+
+    with open(public_key_file_path, 'w') as public_key_file:
+        public_key_file.write(public_key_pem.decode())
+
+    # Create CertificateAuthority instance
+    ca = CertificateAuthority(username=name,password=password, private_key=private_key_pem.decode(), public_key=public_key_pem.decode())
+
+    # Add CA to the session and commit
+    session.add(ca)
+    session.commit()
+
+    return ca
+
+def generate_csr(private_key_pem, common_name):
+    private_key = serialization.load_pem_private_key(
+        private_key_pem.encode(),
+        password=None,
+        backend=default_backend()
+    )
+
+    builder = x509.CertificateSigningRequestBuilder()
+
+    builder = builder.subject_name(x509.Name([
+        x509.NameAttribute(NameOID.COMMON_NAME, common_name)
+    ]))
+
+    csr = builder.sign(private_key, hashes.SHA256(), default_backend())
+
+    csr_pem = csr.public_bytes(encoding=serialization.Encoding.PEM)
+
+    return csr_pem.decode()
 
 
+def sign_csr(csr_pem, ca_private_key_pem, ca_name):
+    csr = x509.load_pem_x509_csr(csr_pem.encode(), default_backend())
+    ca_private_key = serialization.load_pem_private_key(
+        ca_private_key_pem.encode(),
+        password=None,
+        backend=default_backend()
+    )
+
+    certificate = x509.CertificateBuilder().subject_name(
+        csr.subject
+    ).issuer_name(
+        x509.Name([
+            x509.NameAttribute(NameOID.COMMON_NAME, ca_name)
+        ])
+    ).public_key(
+        csr.public_key()
+    ).serial_number(
+        x509.random_serial_number()
+    ).not_valid_before(
+        datetime.utcnow()
+    ).not_valid_after(
+        datetime.utcnow() + timedelta(days=365)  # Adjust validity period as needed
+    ).sign(ca_private_key, hashes.SHA256(), default_backend())
+
+    certificate_pem = certificate.public_bytes(encoding=serialization.Encoding.PEM)
+
+    return certificate_pem.decode()
+
+
+def validate_csr(csr_pem, ca_public_key):
+    try:
+        print("aaaa")
+        # Load CSR from PEM format
+        csr = x509.load_pem_x509_csr(csr_pem, default_backend())
+        hash_algorithm = hashes.SHA256()
+        print("aaaaa")
+        tbs_bytes = csr.tbs_certrequest_bytes
+
+
+        # Use tbs_certrequest_bytes instead of tbs_certificate_bytes
+        print("aaaaa4")
+
+        ca_public_key.verify(
+            csr.signature,
+            tbs_bytes,
+            ec.ECDSA(hash_algorithm)
+        )
+        print("aaaaa5")
+
+    except Exception as e:
+        raise ValueError("CSR signature validation failed") from e
+
+def retrieve_certificate_info(certificate_pem):
+    # Load the certificate
+    certificate = x509.load_pem_x509_certificate(certificate_pem.encode(), default_backend())
+
+    # Retrieve specific fields
+    subject = certificate.subject
+    issuer = certificate.issuer
+    validity_period = (certificate.not_valid_before, certificate.not_valid_after)
+    public_key = certificate.public_key()
+    serial_number = certificate.serial_number
+    # key_usage_extension = certificate.extensions.get_extension_for_oid(ExtensionOID.KEY_USAGE)
+
+    # # Check if KeyUsage extension is present
+    # key_usage = key_usage_extension.value if key_usage_extension else None
+
+    signature_algorithm = certificate.signature_algorithm_oid
+
+    # Convert public key to PEM format
+    public_key_pem = public_key.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+
+    return {
+        'subject': subject,
+        'issuer': issuer,
+        'validity_period': validity_period,
+        'public_key': public_key_pem.decode(),
+        'serial_number': serial_number,
+        # 'key_usage': key_usage,
+        'signature_algorithm': signature_algorithm
+    }
+
+
+
+# # Create a new Certificate Authority
+# ca_instance = create_certificate_authority(session, name="YourCAName")
+
+# # Assuming you have a university professor instance (adjust as needed)
+# professor_name = "Professor Name"
+# professor_instance = create_account(session, username="professor_username", password="professor_password", role="professor", **{"name": professor_name})
+
+# # Generate CSR and sign it to get the certificate
+# professor_csr = generate_csr(professor_instance.public_key, professor_name)
+# signed_certificate = sign_csr(ca_instance.private_key, ca_instance.public_key, professor_csr, professor_name)
+
+# # Save the signed certificate in the database or use it as needed
+# # You can associate the certificate with the professor in the database
+# # For example, create a new Certificate entry in the database
+# certificate_entry = Certificate(user_id=professor_instance.id, public_key=signed_certificate, expiration_date=datetime.utcnow() + timedelta(days=365), ca_id=ca_instance.id)
+# session.add(certificate_entry)
+# session.commit()
 
 def start_server():
     host = '127.0.0.1'
@@ -246,13 +480,22 @@ def start_server():
 
     print(f"Server listening on {host}:{port}")
 
-    # Save the server's key pair
     keys_info = generate_key_pair()
-    # with open('server_private_key.pem', 'wb') as f:
-    #     f.write(keys_info["private_key"].to_pem())
+    private_key, public_key = generate_ecdsa_key_pair()
+    private_key_pem = save_private_key_pem(private_key)
+    public_key_pem = save_public_key_pem(public_key)
+    session = create_session()
+    print('no error 1')
+    ca = create_certificate_authority(session, name="name",password= hash_password("caPassword"))
+    print('no error 2')
+    server_csr = generate_csr(private_key_pem.decode(), 'serverName')
+    print('no error3')
 
-    # with open('server_public_key.pem', 'wb') as f:
-    #     f.write(keys_info["public_key"].to_pem())
+    signed_certificate = sign_csr(server_csr, ca.private_key, 'serverName')
+
+    print('no error4')
+
+
 
     try:
         while True:

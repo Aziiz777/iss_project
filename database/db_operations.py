@@ -1,5 +1,5 @@
 # database/auth_operations.py
-from database.models import User,Student,Professor,UniversityAuthority, Mark
+from database.models import User,Student,Professor,CertificateAuthority, Mark,Certificate
 import hashlib
 import jwt
 import json
@@ -9,6 +9,12 @@ from eth_account import Account,messages
 from web3 import Web3
 from hexbytes import HexBytes
 from sqlalchemy.orm import joinedload,load_only
+from cryptography import x509
+from cryptography.hazmat.backends import default_backend
+from sqlalchemy.exc import IntegrityError
+
+
+
 
 
 
@@ -41,8 +47,8 @@ def create_account(session, username, password,role,**kwargs):
             
         elif role == 'professor':
             new_user = Professor(username=username, password=hash_password(password), **kwargs)
-        elif role == 'university_authority':
-            new_user = UniversityAuthority(username=username, password=hash_password(password), **kwargs)
+        # elif role == 'university_authority':
+        #     new_user = UniversityAuthority(username=username, password=hash_password(password), **kwargs)
         # Create a new user account
         # new_user = User(username=username, password=hash_password(password))
         session.add(new_user)
@@ -110,6 +116,29 @@ def get_user_data(session, jwt_token):
         return {'status': 'error', 'message': 'JWT token has expired'}
     except jwt.InvalidTokenError:
         return {'status': 'error', 'message': 'Invalid JWT token'}
+
+
+def get_ca_data(session,jwt_token, ca_username):
+    try:
+        payload = jwt.decode(jwt_token, SECRET_KEY, algorithms=[ALGORITHM])
+        ca_id_from_token = int(payload.get("sub"))
+        ca = session.query(CertificateAuthority).filter(CertificateAuthority.id == ca_id_from_token).first()
+        if ca:
+            ca_data = {
+                'status': 'success',
+                'message': 'CA data retrieved successfully',
+                'ca_id': ca.id,
+                'username': ca.username,
+                'public_key': ca.public_key,
+                'private_key': ca.private_key
+                    }
+            return ca_data
+        else:
+         return {'status': 'error', 'message': 'CA not found'}
+    except Exception as e:
+        # Handle exceptions, log errors, etc.
+        print(f"Error retrieving CA data: {e}")
+        return {'status': 'error', 'message': 'Error retrieving CA data'}
 
 
 def complete_user_data(session, user_id, phone_number, mobile_number, address, shared_key, jwt_token):
@@ -286,3 +315,77 @@ def send_marks(session, jwt_token,client_public_key,data_signature,data):
         return {'status': 'error', 'message': 'JWT token has expired'}
     except jwt.InvalidTokenError:
         return {'status': 'error', 'message': 'Invalid JWT token'}
+
+
+def store_csr(session, jwt_token, user_id, csr_pem):
+    try:
+        # Decode the JWT token to get the user ID
+        payload = jwt.decode(jwt_token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id_from_token = int(payload.get("sub"))
+        if str(user_id) == str(user_id_from_token):
+            user = session.query(User).filter(User.id == user_id, User.jwt_token == jwt_token).first()
+
+            if user:
+                user.csr_pem = csr_pem
+                session.commit()
+
+                return {'status': 'success', 'message': 'CSR stored successfully'}
+            else:
+                return {'status': 'error', 'message': 'User not found or unauthorized'}
+        else:
+            return {'status': 'error', 'message': 'Invalid JWT token'}
+    except jwt.ExpiredSignatureError:
+        return {'status': 'error', 'message': 'JWT token has expired'}
+    except jwt.InvalidTokenError:
+        return {'status': 'error', 'message': 'Invalid JWT token'}
+
+
+# Function to store a certificate for the user
+def store_certificate(session, client_name: str,ca_name):
+    try:
+        # Retrieve the user by username
+        print(1)
+        user = session.query(User).filter(User.username == client_name).first()
+        print(2)
+
+
+        if user:
+            print(3)
+
+            # Check if the user already has a CSR
+            if user.csr_pem:
+                print(4)
+
+                # Create a CertificateAuthority instance (for demonstration purposes)
+                # In a real-world scenario, you would retrieve the CA information appropriately
+                ca = session.query(CertificateAuthority).filter(CertificateAuthority.username == ca_name).first()
+                print(5)
+                print(user.id)
+                print(user.public_key)
+                print(ca.id)
+                print(datetime.utcnow() + timedelta(days=365))
+
+
+                # Generate a certificate
+                certificate = Certificate(
+                    user_id=user.id,
+                    public_key=user.public_key if user.public_key else "",
+                    expiration_date=datetime.utcnow() + timedelta(days=365),
+                    ca_id=ca.id  # Associate the certificate with the CertificateAuthority
+                )
+                print(6)
+
+
+                # Add the certificate to the session and commit
+                session.add(certificate)
+                session.commit()
+
+                return {'status': 'success', 'message': 'Certificate created successfully'}
+            else:
+                return {'status': 'error', 'message': 'User does not have a CSR'}
+        else:
+            return {'status': 'error', 'message': 'User not found'}
+    except IntegrityError as e:
+        print(f"IntegrityError: {e}")
+        session.rollback()
+        return {'status': 'error', 'message': 'Certificate creation failed (IntegrityError)'}

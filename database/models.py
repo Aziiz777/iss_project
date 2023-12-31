@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, create_engine,ForeignKey, JSON
+from sqlalchemy import Column, Integer, String, Boolean, create_engine,ForeignKey, JSON,DateTime,Text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 
@@ -17,6 +17,9 @@ class User(Base):
     jwt_token = Column(String(512))
     public_key = Column(String(512))
     session_key = Column(String(512))
+    csr_pem = Column(Text)
+    # Add this line to establish the relationship
+    certificate = relationship("Certificate", back_populates="user")
 
 class Student(User):
     __tablename__ = 'students'
@@ -30,12 +33,8 @@ class Professor(User):
 
     id = Column(Integer, ForeignKey('users.id'), primary_key=True)
     marks = relationship("Mark", back_populates="professor")
+    # certificate = relationship("Certificate", back_populates="user")
 
-class UniversityAuthority(User):
-    __tablename__ = 'university_authorities'
-
-    id = Column(Integer, ForeignKey('users.id'), primary_key=True)
-    department = Column(String(100))
 
 class Mark(Base):
     __tablename__ = 'marks'
@@ -50,3 +49,32 @@ class Mark(Base):
     # Define relationships
     professor = relationship("Professor", back_populates="marks")
     student = relationship("Student", back_populates="marks")
+
+
+class CertificateAuthority(User):
+    __tablename__ = 'certificate_authorities'
+
+    id = Column(Integer, ForeignKey('users.id'), primary_key=True, autoincrement=True)
+    private_key = Column(String(512)) 
+    public_key = Column(String(512))
+    certificates = relationship("Certificate", back_populates="ca")
+
+class Certificate(Base):
+    __tablename__ = 'certificates'
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'))
+    public_key = Column(String(512), unique=True)
+    expiration_date = Column(DateTime)
+    
+    # Update this line to specify the foreign key relationship
+    ca_id = Column(Integer, ForeignKey('certificate_authorities.id'))
+
+    # Define relationships
+    user = relationship("User", back_populates="certificate")
+    
+    # Specify the foreign key relationship for CertificateAuthority
+    ca = relationship("CertificateAuthority", back_populates="certificates", foreign_keys=[ca_id])
+
+
+
