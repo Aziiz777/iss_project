@@ -62,7 +62,22 @@ def login(session, username, password):
         jwt_token = create_jwt_token(jwt_data)
         user.jwt_token = jwt_token
         session.commit()
-        return {'status': 'success', 'message': 'Login successful', 'jwt_token': user.jwt_token, 'user_id': user.id}
+
+        role = None
+        if session.query(Student).filter_by(id=user.id).first():
+            role='student'
+        elif session.query(Professor).filter_by(id=user.id).first():
+            role = "professor"
+        elif session.query(CertificateAuthority).filter_by(id=user.id).first():
+            role = "certificate authority"
+
+        return {
+            'status': 'success', 
+            'message': 'Login successful', 
+            'jwt_token': user.jwt_token, 
+            'user_id': user.id,
+            'role': role
+        }
     else:
         return {'status': 'error', 'message': 'Invalid username or password'}
 

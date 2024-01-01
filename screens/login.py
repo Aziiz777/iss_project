@@ -64,14 +64,17 @@ class Login(tk.Frame):
         if response['status'].lower() == 'success':
             token = response['jwt_token']
             user_id = response['user_id']
-            self.next_page(token, user_id)
+            role = response['role']
+            self.next_page(token, user_id, role)
     
-    def next_page(self, token, user_id):        
+    def next_page(self, token, user_id, role):        
         self.pack_forget()
+        if role.lower() == 'student':
+            national_id_frame = NationalId(self.master.master, token, user_id)
+            national_id_frame.pack()
+        elif role.lower() == 'professor':
+            print('PROF')
 
-        national_id_frame = NationalId(self.master.master, token, user_id)
-        national_id_frame.pack()
-    
     def back(self):
         self.destroy()        
         self.show_main()
