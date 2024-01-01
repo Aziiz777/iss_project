@@ -55,12 +55,9 @@ def send_request(action, data,jwt_token=None):
             # Convert the encrypted data to base64 before including it in the JSON
             encrypted_data_base64 = base64.b64encode(encrypted_data).decode('utf-8')
             request_data['data'] = encrypted_data_base64
-
             # print(f"The request_data is: {request_data}")
-
             request_json = json.dumps(request_data)
             client_socket.send(request_json.encode('utf-8'))
-
             # Send the length of the data after sending the JSON
             length = len(request_json)
             client_socket.send(str(length).encode('utf-8').ljust(16))
@@ -83,7 +80,6 @@ def send_request(action, data,jwt_token=None):
             request_data['data'] = encrypted_data_base64
             request_json = json.dumps(request_data)
             client_socket.send(request_json.encode('utf-8'))
-
             # Send the length of the data after sending the JSON
             length = len(request_json)
             client_socket.send(str(length).encode('utf-8').ljust(16))
@@ -306,8 +302,8 @@ def read_key_from_file(file_path):
 if __name__ == "__main__":
     # Test creating an account
     print("---------------------Start Create Account Test --------------------------------\n")
-    # create_account_response = send_request('create_account', {'username': 'testuserStudent', 'password': 'testpasswordStudent','role':'student'})
-    create_account_response = send_request('create_account', {'username': 'testuserProfessor', 'password': 'testpasswordProfessor','role':'professor'})
+    create_account_response = send_request('create_account', {'username': 'testuserStudent', 'password': 'testpasswordStudent','role':'student'})
+    # create_account_response = send_request('create_account', {'username': 'testuserProfessor', 'password': 'testpasswordProfessor','role':'professor'})
     print(f"{create_account_response} \n")
     print("---------------------End Create Account Test --------------------------------")
 
@@ -315,8 +311,8 @@ if __name__ == "__main__":
     # Test login
     print("\n---------------------Start LogIn Test --------------------------------\n")
 
-    login_response = send_request('login', {'username': 'testuserProfessor', 'password': 'testpasswordProfessor'})
-    # login_response = send_request('login', {'username': 'testuserStudent', 'password': 'testpasswordStudent'})
+    # login_response = send_request('login', {'username': 'testuserProfessor', 'password': 'testpasswordProfessor'})
+    login_response = send_request('login', {'username': 'testuserStudent', 'password': 'testpasswordStudent'})
     print(f"{login_response} \n")
     print("---------------------End LogIn Test --------------------------------")
 
@@ -457,9 +453,5 @@ if __name__ == "__main__":
     print("----------------End signning professor csr -----------------------------")
     # print("After send_request:", certificate_data)
     login_response = send_request('login', {'username': 'name', 'password': 'caPassword'})
-
-
-    
-
 
 
