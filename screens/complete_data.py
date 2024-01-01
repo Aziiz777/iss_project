@@ -44,20 +44,20 @@ class CompleteData(tk.Frame):
         national_id = self.national_id
         token = self.token
 
-        # response = send_request(
-        #     'complete_user_data',
-        #     {
-        #         'phone_number': phone,
-        #         'mobile_number': mobile,
-        #         'address': add,
-        #         'user_id': user_id,
-        #         'national_id': national_id,
-        #         'jwt_token': token
-        #     },
-        #     token
-        #     )
+        response = send_request(
+            'complete_user_data',
+            {
+                'phone_number': phone,
+                'mobile_number': mobile,
+                'address': add,
+                'user_id': user_id,
+                'national_id': national_id,
+                'jwt_token': token
+            },
+            token
+            )
         
-        # print(response)
+        print(response)
         # message = response['message']
         # messagebox.showinfo("Response", message)
 
