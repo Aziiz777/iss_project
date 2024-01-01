@@ -159,9 +159,6 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 server_private_key.pem
-<<<<<<< HEAD
 university_system.db
-=======
 private_key.pem
 public_key.pem
->>>>>>> develop

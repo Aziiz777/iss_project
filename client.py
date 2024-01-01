@@ -239,9 +239,6 @@ def generate_session_key(client_private_key):
         "signature": signature.signature.hex()
     }
 
-<<<<<<< HEAD
-def execute():
-=======
 def generate_ecdsa_key_pair():
     # Generate a random private key
     private_key_bytes = secrets.token_bytes(32)
@@ -307,7 +304,6 @@ def read_key_from_file(file_path):
 
 
 if __name__ == "__main__":
->>>>>>> develop
     # Test creating an account
     print("---------------------Start Create Account Test --------------------------------\n")
     # create_account_response = send_request('create_account', {'username': 'testuserStudent', 'password': 'testpasswordStudent','role':'student'})
@@ -420,8 +416,6 @@ if __name__ == "__main__":
     # # Send marks for the specific project
     print("\n------------------Start sending projects marks-----------------")
     send_request('send_marks', {'jwt_token': jwt_token,'marks_data_signature':signature.signature.hex(), 'marks_data': marks_data,'session_key':session_key},jwt_token)
-<<<<<<< HEAD
-=======
     print("\n------------------End sending projects marks -----------------\n")
 
 
@@ -466,10 +460,4 @@ if __name__ == "__main__":
 
 
     
->>>>>>> develop
-
-
-if __name__ == "semaphore":
-    execute()
-
 

@@ -268,12 +268,7 @@ def send_response(client_socket, response_data):
         response_data = json.dumps(response_data)
         length = str(len(response_data)).ljust(16)
         if client_socket.fileno() != -1:
-<<<<<<< HEAD
-            # Socket is open, proceed with sending data
-            # print(f"send length : {length.encode('utf-8')}")
-=======
             print(f"send length : {length.encode('utf-8')}")
->>>>>>> develop
             client_socket.send(length.encode('utf-8'))
             # print(f"send data : {response_data.encode('utf-8')}")
             client_socket.send(response_data.encode('utf-8'))
@@ -540,13 +535,6 @@ def start_server():
     print('no error4')
 
 
-<<<<<<< HEAD
-    # with open('server_public_key.pem', 'wb') as f:
-    #     f.write(keys_info["public_key"].to_pem())
-    
-    # Create a new thread for handling the third task
-=======
->>>>>>> develop
 
     try:
         while True:
