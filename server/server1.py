@@ -26,7 +26,7 @@ from cryptography.hazmat.primitives import hashes, hmac
 from cryptography.x509.oid import ExtensionOID
 
 
-
+import time
 
 def handle_client(client_socket, session,server_public_key=None):
    
@@ -270,9 +270,8 @@ def send_response(client_socket, response_data):
         if client_socket.fileno() != -1:
             print(f"send length : {length.encode('utf-8')}")
             client_socket.send(length.encode('utf-8'))
-            print(f"send data : {response_data.encode('utf-8')}")
+            # print(f"send data : {response_data.encode('utf-8')}")
             client_socket.send(response_data.encode('utf-8'))
-            print(f"send data : {response_data.encode('utf-8')}")
         else:
             print("Socket is closed.")
     except ConnectionAbortedError:
@@ -548,8 +547,14 @@ def start_server():
 
     except KeyboardInterrupt:
         print("Server shutting down.")
+        
+
+    except ConnectionAbortedError:
+        print(f"Connection aborted by the client.")
+
     finally:
         server_socket.close()
 
-if __name__ == "__main__":
+
+if __name__ == "semaphore":
     start_server()

@@ -42,10 +42,10 @@ def create_account(session, username, password,role,**kwargs):
         return {'status': 'error', 'message': 'Username already exists'}
     else:
                 # Create a new user account based on the specified role
-        if role == 'student':
+        if role.lower() == 'student' :
             new_user = Student(username=username, password=hash_password(password), **kwargs)
             
-        elif role == 'professor':
+        elif role.lower() == 'professor':
             new_user = Professor(username=username, password=hash_password(password), **kwargs)
         # elif role == 'university_authority':
         #     new_user = UniversityAuthority(username=username, password=hash_password(password), **kwargs)
@@ -62,7 +62,7 @@ def login(session, username, password):
         jwt_token = create_jwt_token(jwt_data)
         user.jwt_token = jwt_token
         session.commit()
-        return {'status': 'success', 'message': 'Login successful', 'jwt_token': user.jwt_token,'user_id': user.id}
+        return {'status': 'success', 'message': 'Login successful', 'jwt_token': user.jwt_token, 'user_id': user.id}
     else:
         return {'status': 'error', 'message': 'Invalid username or password'}
 
