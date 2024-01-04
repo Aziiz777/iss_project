@@ -1,6 +1,7 @@
 import tkinter as tk
 import tkinter.messagebox as messagebox
 from client import send_request
+from screens.enter_projects import EnterProjects
 
 class CompleteData(tk.Frame):
 
@@ -44,27 +45,29 @@ class CompleteData(tk.Frame):
         national_id = self.national_id
         token = self.token
 
-        response = send_request(
-            'complete_user_data',
-            {
-                'phone_number': phone,
-                'mobile_number': mobile,
-                'address': add,
-                'user_id': user_id,
-                'national_id': national_id,
-                'jwt_token': token
-            },
-            token
-            )
+        # response = send_request(
+        #     'complete_user_data',
+        #     {
+        #         'phone_number': phone,
+        #         'mobile_number': mobile,
+        #         'address': add,
+        #         'user_id': user_id,
+        #         'national_id': national_id,
+        #         'jwt_token': token
+        #     },
+        #     token
+        #     )
         
-        print(response)
         # message = response['message']
         # messagebox.showinfo("Response", message)
 
         # if response['status'].lower() == 'success':
         #     self.next_page(user_id, token, national_id)
 
-        self.next_page()
+        self.next_page(user_id, token)
 
-    def next_page(self):
-        print('next')
+    def next_page(self, user_id, token):
+        self.pack_forget()
+
+        projects_frame = EnterProjects(self.master, user_id, token)
+        projects_frame.pack()

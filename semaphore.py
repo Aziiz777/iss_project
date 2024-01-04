@@ -2,6 +2,7 @@ import threading, time
 from database.db_manager import init_db
 from server.server1 import start_server
 from screens.app import start_app
+import os
 
 class Semaphore:
     def __init__(self, count):
@@ -23,6 +24,10 @@ class Semaphore:
 class Thread1(threading.Thread):
     def run(self):
         print("Thread 1 started")
+
+        db = 'university_system.db'
+        if os.path.exists(db):
+            os.remove(db)
         
         init_db()
         start_server()
