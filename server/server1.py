@@ -232,9 +232,9 @@ def project_descriptions_handler(client_socket, session, user_id, project_descri
         print(f'data raw::: {response_data}')
         encrypted_response_data = encrypt_data(session_key, response_json)
         encrypted_response_base64 = base64.b64encode(encrypted_response_data).decode('utf-8')
-        print(f"error ::: {encrypted_response_base64}")
+        print(f"data encrypted ::: {encrypted_response_base64}")
         send_response(client_socket, {'data': encrypted_response_base64})
-        print("error here 4")
+        
     except Exception as e:
         print(f"Error handling complete_user_data request: {e}")
         send_response(client_socket, {'status': 'error', 'message': 'Server error'})
@@ -270,8 +270,10 @@ def send_response(client_socket, response_data):
         if client_socket.fileno() != -1:
             print(f"send length : {length.encode('utf-8')}")
             client_socket.send(length.encode('utf-8'))
+            time.sleep(0.1)
             # print(f"send data : {response_data.encode('utf-8')}")
             client_socket.send(response_data.encode('utf-8'))
+            time.sleep(0.1)
         else:
             print("Socket is closed.")
     except ConnectionAbortedError:
