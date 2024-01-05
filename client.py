@@ -38,7 +38,7 @@ def send_request(action, data,jwt_token=None):
             request_data['certificate'] = certificate_data 
 
         if jwt_token:
-         request_data['headers'] = {'Authorization':jwt_token}
+            request_data['headers'] = {'Authorization':jwt_token}
 
         # Encrypt data if the action is "complete_user_data"
         if action == 'add_national_id':
@@ -306,8 +306,8 @@ def read_key_from_file(file_path):
 if __name__ == "__main__":
     # Test creating an account
     print("---------------------Start Create Account Test --------------------------------\n")
-    # create_account_response = send_request('create_account', {'username': 'testuserStudent', 'password': 'testpasswordStudent','role':'student'})
-    create_account_response = send_request('create_account', {'username': 'testuserProfessor', 'password': 'testpasswordProfessor','role':'professor'})
+    create_account_response = send_request('create_account', {'username': 'testuserStudent', 'password': 'testpasswordStudent','role':'student'})
+    # create_account_response = send_request('create_account', {'username': 'testuserProfessor', 'password': 'testpasswordProfessor','role':'professor'})
     print(f"{create_account_response} \n")
     print("---------------------End Create Account Test --------------------------------")
 
@@ -315,8 +315,8 @@ if __name__ == "__main__":
     # Test login
     print("\n---------------------Start LogIn Test --------------------------------\n")
 
-    login_response = send_request('login', {'username': 'testuserProfessor', 'password': 'testpasswordProfessor'})
-    # login_response = send_request('login', {'username': 'testuserStudent', 'password': 'testpasswordStudent'})
+    # login_response = send_request('login', {'username': 'testuserProfessor', 'password': 'testpasswordProfessor'})
+    login_response = send_request('login', {'username': 'testuserStudent', 'password': 'testpasswordStudent'})
     print(f"{login_response} \n")
     print("---------------------End LogIn Test --------------------------------")
 

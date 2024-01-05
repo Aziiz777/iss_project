@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import messagebox
 from client import send_request
+from screens.national_id import NationalId
 
 class SignUp(tk.Frame):
     def __init__(self, master, show_main):
@@ -65,11 +66,21 @@ class SignUp(tk.Frame):
             }
             )
 
-        message = response['message']
+        message = response.get('message')
 
         # Display response using a messagebox
         messagebox.showinfo("Response", message)
 
+        if response['status'].lower() == 'success':
+            token = response['jwt_token']
+            user_id = response['user_id']
+            self.next_page(token, user_id)
+
+    def next_page(self, token, user_id):        
+        self.pack_forget()
+        national_id_frame = NationalId(self.master.master, token, user_id)
+        national_id_frame.pack()
+    
     def back(self):
         self.destroy()
         self.show_main()

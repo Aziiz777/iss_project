@@ -52,8 +52,17 @@ def create_account(session, username, password,role,**kwargs):
         # Create a new user account
         # new_user = User(username=username, password=hash_password(password))
         session.add(new_user)
+        new_user = session.query(User).filter_by(username= username, password=hash_password(password)).first()
+        jwt_data = {"sub": str(new_user.id)}
+        jwt_token = create_jwt_token(jwt_data)
+        new_user.jwt_token = jwt_token
         session.commit()
-        return {'status': 'success', 'message': 'Account created successfully'}
+        return {
+            'status': 'success', 
+            'message': 'Account created successfully', 
+            'jwt_token': new_user.jwt_token,
+            'user_id': new_user.id
+        }
 
 def login(session, username, password):
     user = session.query(User).filter_by(username=username, password=hash_password(password)).first()
