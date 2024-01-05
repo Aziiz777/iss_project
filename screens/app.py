@@ -1,3 +1,10 @@
+import sys
+import os
+
+current_folder = os.path.abspath(os.path.dirname(__file__))
+project_folder = os.path.abspath(os.path.join(current_folder, os.pardir))
+sys.path.append(project_folder)
+
 import tkinter as tk
 from screens.login import Login
 from screens.signup import SignUp
@@ -42,5 +49,5 @@ def start_app():
 
     root.mainloop()
 
-if __name__ == "semaphore":
+if __name__ == "__main__":
     start_app()

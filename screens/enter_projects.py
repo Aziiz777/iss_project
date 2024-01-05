@@ -52,6 +52,11 @@ class EnterProjects(tk.Frame):
         self.user_id = user_id
         self.token = token
         self.project_list = []
+        self.first_run = True
+        self.keys_info = None
+        self.session_key_info = None
+        self.session_key = None
+        self.signature = None
 
         self.scrollbar = tk.Scrollbar(self)
         self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
@@ -76,29 +81,32 @@ class EnterProjects(tk.Frame):
         user_id = self.user_id
         token = self.token
 
-        keys_info = generate_key_pair()
-        session_key_info = generate_session_key(keys_info['private_key'])
-        session_key = session_key_info['session_key']
-        signature = session_key_info['signature']
+        if self.first_run:
+            self.keys_info = generate_key_pair()
+            self.session_key_info = generate_session_key(self.keys_info['private_key'])
+            self.session_key = self.session_key_info['session_key']
+            self.signature = self.session_key_info['signature']
 
-        handshake_response = send_request(
-            'handshake',
-            {
-                'user_id': user_id,
-                'public_key': keys_info['public_key'],
-                'session_key': session_key,
-                'signature': signature
-            },
-            token
-            )
-        
-        if handshake_response['status'].lower() == 'success':
-            message = (f"Handshaking done successfully."
-            f"\nPrivate key: {keys_info['private_key']}" 
-            f"\nPublic key: {keys_info['public_key']}" 
-            f"\nServer key: {handshake_response['server_public_key']}")
+            response = send_request(
+                'handshake',
+                {
+                    'user_id': user_id,
+                    'public_key': self.keys_info['public_key'],
+                    'session_key': self.session_key,
+                    'signature': self.signature
+                },
+                token
+                )
 
-            messagebox.showinfo("Handshaking", message)
+            if response['status'].lower() == 'success':
+                message = (f"Handshaking done successfully."
+                f"\nPrivate key: {self.keys_info['private_key']}" 
+                f"\nPublic key: {self.keys_info['public_key']}" 
+                f"\nServer key: {response['server_public_key']}")
+
+                messagebox.showinfo("Handshaking", message)
+
+                self.first_run = False
 
         selected_projects = [project.get_project_info() for project in self.project_list]
 
@@ -106,11 +114,17 @@ class EnterProjects(tk.Frame):
             'project_descriptions',
             {
                 'user_id': user_id,
-                'token': token,
-                'session_key': session_key,
+                'jwt_token': token,
+                'session_key': self.session_key,
                 'project_descriptions': selected_projects
             },
             token
         )
 
-        print(response)
+        message = response['message']
+        messagebox.showinfo('Response', message)
+
+        if response['status'].lower() == 'success':
+            self.project_textbox.config(state=tk.NORMAL)
+            self.project_textbox.delete(1.0, tk.END)
+            self.project_textbox.config(state=tk.DISABLED)

@@ -209,9 +209,9 @@ def complete_user_data_handler(client_socket, session, user_id, phone_number, mo
         print(f'data raw::: {response_data}')
         encrypted_response_data = encrypt_data(national_id, response_json)
         encrypted_response_base64 = base64.b64encode(encrypted_response_data).decode('utf-8')
-        print(f"error ::: {encrypted_response_base64}")
+        print(f"data encrypted ::: {encrypted_response_base64}")
         send_response(client_socket, {'data': encrypted_response_base64})
-        print("error here 4")
+        
     except Exception as e:
         print(f"Error handling complete_user_data request: {e}")
         send_response(client_socket, {'status': 'error', 'message': 'Server error'})
@@ -556,5 +556,5 @@ def start_server():
         server_socket.close()
 
 
-if __name__ == "semaphore":
+if __name__ == "__main__":
     start_server()

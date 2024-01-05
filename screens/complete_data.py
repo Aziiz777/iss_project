@@ -45,26 +45,24 @@ class CompleteData(tk.Frame):
         national_id = self.national_id
         token = self.token
 
-        # response = send_request(
-        #     'complete_user_data',
-        #     {
-        #         'phone_number': phone,
-        #         'mobile_number': mobile,
-        #         'address': add,
-        #         'user_id': user_id,
-        #         'national_id': national_id,
-        #         'jwt_token': token
-        #     },
-        #     token
-        #     )
+        response = send_request(
+            'complete_user_data',
+            {
+                'phone_number': phone,
+                'mobile_number': mobile,
+                'address': add,
+                'user_id': user_id,
+                'national_id': national_id,
+                'jwt_token': token
+            },
+            token
+            )
         
-        # message = response['message']
-        # messagebox.showinfo("Response", message)
+        message = response['message']
+        messagebox.showinfo("Response", message)
 
-        # if response['status'].lower() == 'success':
-        #     self.next_page(user_id, token, national_id)
-
-        self.next_page(user_id, token)
+        if response['status'].lower() == 'success':
+            self.next_page(user_id, token)        
 
     def next_page(self, user_id, token):
         self.pack_forget()
