@@ -8,13 +8,14 @@ from client import generate_session_key
 from eth_account import Account,messages
 
 class SendMarks(tk.Frame):
-    def __init__(self, master, args):
+    def __init__(self, master, args, back_to_prof):
         tk.Frame.__init__(self, master)
 
         self.user_id = args['user_id']
         self.token = args['token']
         data = args['data']['project_descriptions']
         self.projects = self.extract_projects(data)
+        self.back_to_prof = back_to_prof
 
         self.keys_info = generate_key_pair()
         self.session_key_info = generate_session_key(self.keys_info['private_key'])
@@ -59,6 +60,10 @@ class SendMarks(tk.Frame):
             divider = tk.Label(content_frame, bg="grey")
             divider.pack(fill=tk.X)
 
+        
+        self.back_btn = tk.Button(content_frame, text="Back", command=self.back)
+        self.back_btn.pack(pady=20 ,anchor="center", ipady=2, ipadx=10)
+        
         # Create the scrollbar and canvas
         self.scrollbar = tk.Scrollbar(self, command=self.canvas.yview)
         self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
@@ -142,3 +147,7 @@ class SendMarks(tk.Frame):
                 count += 1
 
         return projects
+    
+    def back(self):
+        self.destroy()
+        self.back_to_prof()
