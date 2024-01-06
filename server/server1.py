@@ -33,7 +33,6 @@ import time
 def handle_client(client_socket, session,server_public_key=None):
    
     try:
-        # Receive client request
         request_data = client_socket.recv(2048)
         print(f"Received raw data: {request_data}")
         request_json = json.loads(request_data)
@@ -41,31 +40,20 @@ def handle_client(client_socket, session,server_public_key=None):
 
         print(f"Received json:{request_json} ")
 
-        # Extract JWT token from headers if present
         jwt_token = None
         if 'headers' in request_json:
             headers = request_json['headers']
             if 'Authorization' in headers:
                 jwt_token = headers['Authorization']
-                # Extract the token part from the Authorization header
-                # _, jwt_token = auth_header.split(' ', 1)
+
 
         if 'certificate' in request_json: 
-            print('enter')
             certificate = request_json['certificate']
-            print('enter1')
             ca_data = get_ca_data(session,jwt_token,"name")
-            print('erorororor')
             ca_pub_key = ca_data['public_key']
-            # certificate_info = retrieve_certificate_info(certificate)
-            # print('enter2')
-            # ca_pub_key = certificate_info['public_key']
-            print(ca_pub_key)
             response_data =  verify_client_certificate(certificate,ca_pub_key)
-            print(response_data)
             if response_data['status'] =='error':
                 send_response(client_socket,response_data)
-            print('enter3')
 
 
         if request_json['action'] == 'handshake':
@@ -100,15 +88,10 @@ def handle_client(client_socket, session,server_public_key=None):
         #  here we should decrypt the request to get the action and the data 
 
         elif request_json['action'] == 'complete_user_data':
-            # print('entered the action block1')
             user_data = get_user_data(session, jwt_token)
-            # print('entered the action block2')
             encrypted_request_data = base64.b64decode(request_json['data'])
-            # print(f"here is the encrypted_request_data  {encrypted_request_data}")
             decrypted_request_data = decrypt_data(user_data['national_id'], encrypted_request_data)
-            # print('entered the action block3')
             decrypted_request_json = json.loads(decrypted_request_data)
-            # print('entered the action block4')
 
             user_id = decrypted_request_json['user_id']
             phone_number = decrypted_request_json['phone_number']
@@ -116,7 +99,6 @@ def handle_client(client_socket, session,server_public_key=None):
             address = decrypted_request_json['address']
             national_id = decrypted_request_json['national_id']
             jwt_token = decrypted_request_json['jwt_token']
-            # print(' the action block')
 
 
             complete_user_data_handler(client_socket, session, user_id, phone_number, mobile_number, address, national_id, jwt_token)
@@ -161,16 +143,11 @@ def handle_client(client_socket, session,server_public_key=None):
             ca_username = request_json['data']['ca_username']
             client_csr = request_json['data']['client_csr']
             client_name = request_json['data']['client_name']
-            print('erorororor')
             ca_data = get_ca_data(session,jwt_token,ca_username)
-            print('erorororor')
             ca_public_key = ca_data['public_key']
-            print('erorororor')
             ca_private_key = ca_data['private_key']
             print(ca_private_key)
-            print('erorororor')
             signed_certificate_response = sign_csr(client_csr,ca_private_key,ca_data['username'])
-            print('erorororor')
             store_certificate_handler(client_socket,session,signed_certificate_response.get('certificate',''))
 
         else:
@@ -193,7 +170,6 @@ def login_handler(client_socket, session, username, password):
 
 def add_national_id_handler(client_socket,session,jwt_token,national_id,user_id):
     response_data = add_national_id(session,jwt_token,national_id,user_id)
-    print(f'this response data: {response_data}')
     send_response(client_socket,response_data)
 
 def get_user_data_handler(client_socket, session, jwt_token):
@@ -219,9 +195,8 @@ def complete_user_data_handler(client_socket, session, user_id, phone_number, mo
         print(f'data raw::: {response_data}')
         encrypted_response_data = encrypt_data(national_id, response_json)
         encrypted_response_base64 = base64.b64encode(encrypted_response_data).decode('utf-8')
-        print(f"error ::: {encrypted_response_base64}")
+        print(f"encrypted response :: {encrypted_response_base64}")
         send_response(client_socket, {'data': encrypted_response_base64})
-        print("error here 4")
     except Exception as e:
         print(f"Error handling complete_user_data request: {e}")
         send_response(client_socket, {'status': 'error', 'message': 'Server error'})
@@ -242,9 +217,8 @@ def project_descriptions_handler(client_socket, session, user_id, project_descri
         print(f'data raw::: {response_data}')
         encrypted_response_data = encrypt_data(session_key, response_json)
         encrypted_response_base64 = base64.b64encode(encrypted_response_data).decode('utf-8')
-        print(f"error ::: {encrypted_response_base64}")
+        print(f"encrypted_response ::: {encrypted_response_base64}")
         send_response(client_socket, {'data': encrypted_response_base64})
-        print("error here 4")
     except Exception as e:
         print(f"Error handling complete_user_data request: {e}")
         send_response(client_socket, {'status': 'error', 'message': 'Server error'})
@@ -281,11 +255,9 @@ def send_csr_handler(client_socket,session,jwt_token,user_id,professor_csr,sessi
     # send_response(client_socket,response_data)
 
 def store_certificate_handler(client_socket,session, certificate):
-    print("nooooo error ")
     certificate_info = retrieve_certificate_info(certificate)
     print(certificate_info)
     response_data = store_certificate(session , certificate_info['subject'].get_attributes_for_oid(NameOID.COMMON_NAME)[0].value,certificate_info['issuer'].get_attributes_for_oid(NameOID.COMMON_NAME)[0].value,certificate)
-    print("nooooo error ")
     send_response(client_socket,response_data)
 
 def send_response(client_socket, response_data):
@@ -410,9 +382,7 @@ def generate_csr(private_key_pem, common_name):
 
 def sign_csr(csr_pem, ca_private_key_pem, ca_name):
     try:
-        print("error here1")
         csr = x509.load_pem_x509_csr(csr_pem.encode(), default_backend())
-        print("error here2")
 
         ca_private_key = serialization.load_pem_private_key(
             ca_private_key_pem.encode(),
@@ -580,15 +550,10 @@ def start_server():
     private_key_pem = save_private_key_pem(private_key)
     public_key_pem = save_public_key_pem(public_key)
     session = create_session()
-    print('no error 1')
     ca = create_certificate_authority(session, name="name",password= hash_password("caPassword"))
-    print('no error 2')
     server_csr = generate_csr(private_key_pem.decode(), 'serverName')
-    print('no error3')
 
     signed_certificate = sign_csr(server_csr, ca.private_key, 'serverName')
-
-    print('no error4')
 
 
 
