@@ -15,9 +15,6 @@ from sqlalchemy.exc import IntegrityError
 
 
 
-
-
-
 def hash_password(password):
     return hashlib.sha256(password.encode('utf-8')).hexdigest()
 
@@ -380,3 +377,26 @@ def store_certificate(session, client_name: str,ca_name,certificate_data: str):
         print(f"IntegrityError: {e}")
         session.rollback()
         return {'status': 'error', 'message': 'Certificate creation failed (IntegrityError)'}
+
+
+def get_all_csrs(session):
+    try:
+        users = session.query(User).filter(User.csr_pem.isnot(None)).all()
+
+        csrs_data = {}
+
+        for user in users:
+            csr_info = {
+                'user_id': user.id,
+                'username': user.username,
+                'csr_pem': user.csr_pem
+            }
+
+            csrs_data[user.id] = csr_info
+
+        return {'status': 'success', 'csrs': csrs_data}
+
+    except Exception as e:
+        print(f"Error fetching CSRs: {e}")
+        return {'status': 'error', 'message': 'Error fetching CSRs'}
+

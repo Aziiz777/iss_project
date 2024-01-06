@@ -8,7 +8,7 @@ from eth_account import Account
 import pickle
 from database.db_manager import create_session
 from database.models import User,CertificateAuthority
-from database.db_operations import create_account,login,complete_user_data,add_national_id,get_user_data,get_ca_data,get_all_project_descriptions,handShaking,add_project_descriptions,send_marks,store_csr,hash_password,store_certificate
+from database.db_operations import create_account,login,complete_user_data,add_national_id,get_user_data,get_ca_data,get_all_project_descriptions,handShaking,add_project_descriptions,send_marks,store_csr,hash_password,store_certificate,get_all_csrs
 from symmetric_encryption import encrypt_data,decrypt_data
 from sqlalchemy.orm import Session
 from cryptography.hazmat.backends import default_backend
@@ -84,8 +84,8 @@ def handle_client(client_socket, session,server_public_key=None):
             get_user_data_handler(client_socket,session,jwt_token)
         elif request_json['action'] == 'get_all_project_descriptions':
             get_all_project_descriptions_handler(client_socket,session)
-        # else
-        #  here we should decrypt the request to get the action and the data 
+        elif request_json['action'] == 'get_all_csrs':
+            get_all_csrs_handler(client_socket,session)    
 
         elif request_json['action'] == 'complete_user_data':
             user_data = get_user_data(session, jwt_token)
@@ -176,6 +176,10 @@ def get_user_data_handler(client_socket, session, jwt_token):
 
 def get_all_project_descriptions_handler(client_socket,session):
     response_data = get_all_project_descriptions(session)
+    send_response(client_socket,response_data)
+
+def get_all_csrs_handler(client_socket,session):
+    response_data = get_all_csrs(session)
     send_response(client_socket,response_data)
 
 def complete_user_data_handler(client_socket, session, user_id, phone_number, mobile_number, address, national_id, jwt_token):

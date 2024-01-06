@@ -56,7 +56,7 @@ class CertificateAuthority(User):
 
     id = Column(Integer, ForeignKey('users.id'), primary_key=True, autoincrement=True)
     private_key = Column(String(512)) 
-    public_key = Column(String(512))
+    # public_key = Column(String(512))
     certificates = relationship("Certificate", back_populates="ca")
 
 class Certificate(Base):

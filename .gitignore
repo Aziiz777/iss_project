@@ -161,3 +161,4 @@ cython_debug/
 server_private_key.pem
 private_key.pem
 public_key.pem
+university_system.db
