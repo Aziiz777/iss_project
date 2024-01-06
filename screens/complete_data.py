@@ -1,6 +1,7 @@
 import tkinter as tk
 import tkinter.messagebox as messagebox
 from client import send_request
+from screens.enter_projects import EnterProjects
 
 class CompleteData(tk.Frame):
 
@@ -57,14 +58,14 @@ class CompleteData(tk.Frame):
             token
             )
         
-        print(response)
-        # message = response['message']
-        # messagebox.showinfo("Response", message)
+        message = response['message']
+        messagebox.showinfo("Response", message)
 
-        # if response['status'].lower() == 'success':
-        #     self.next_page(user_id, token, national_id)
+        if response['status'].lower() == 'success':
+            self.next_page(user_id, token)        
 
-        self.next_page()
+    def next_page(self, user_id, token):
+        self.pack_forget()
 
-    def next_page(self):
-        print('next')
+        projects_frame = EnterProjects(self.master, user_id, token)
+        projects_frame.pack()

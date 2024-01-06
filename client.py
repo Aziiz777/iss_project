@@ -38,7 +38,7 @@ def send_request(action, data,jwt_token=None):
             request_data['certificate'] = certificate_data 
 
         if jwt_token:
-         request_data['headers'] = {'Authorization':jwt_token}
+            request_data['headers'] = {'Authorization':jwt_token}
         print(f"original data request: {json.dumps(request_data)}")
 
 
@@ -325,6 +325,8 @@ if __name__ == "__main__":
 
     # login_response = send_request('login', {'username': 'testuserProfessor', 'password': 'testpasswordProfessor'})
     login_response = send_request('login', {'username': 'testuserStudent', 'password': 'testpasswordStudent'})
+    # login_response = send_request('login', {'username': 'testuserProfessor', 'password': 'testpasswordProfessor'})
+    login_response = send_request('login', {'username': 'testuserStudent', 'password': 'testpasswordStudent'})
     print(f"{login_response} \n")
     print("---------------------End LogIn Test --------------------------------")
 
@@ -462,6 +464,11 @@ if __name__ == "__main__":
     print(login_response)
 
     print("----------------End LogIn with CA Credentials -----------------------------\n")
+
+    print("\n------------------get all users csrs -----------------")
+
+    get_all_csr_response = send_request ('get_all_csrs',{'jwt_token':jwt_token})
+    print(get_all_csr_response)
 
     # print("Before send_request:", certificate_data)
     print("----------------Start signning professor csr -----------------------------\n")

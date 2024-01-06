@@ -49,8 +49,17 @@ def create_account(session, username, password,role,**kwargs):
         # Create a new user account
         # new_user = User(username=username, password=hash_password(password))
         session.add(new_user)
+        new_user = session.query(User).filter_by(username= username, password=hash_password(password)).first()
+        jwt_data = {"sub": str(new_user.id)}
+        jwt_token = create_jwt_token(jwt_data)
+        new_user.jwt_token = jwt_token
         session.commit()
-        return {'status': 'success', 'message': 'Account created successfully'}
+        return {
+            'status': 'success', 
+            'message': 'Account created successfully', 
+            'jwt_token': new_user.jwt_token,
+            'user_id': new_user.id
+        }
 
 def login(session, username, password):
     user = session.query(User).filter_by(username=username, password=hash_password(password)).first()
@@ -59,7 +68,22 @@ def login(session, username, password):
         jwt_token = create_jwt_token(jwt_data)
         user.jwt_token = jwt_token
         session.commit()
-        return {'status': 'success', 'message': 'Login successful', 'jwt_token': user.jwt_token, 'user_id': user.id}
+
+        role = None
+        if session.query(Student).filter_by(id=user.id).first():
+            role='student'
+        elif session.query(Professor).filter_by(id=user.id).first():
+            role = "professor"
+        elif session.query(CertificateAuthority).filter_by(id=user.id).first():
+            role = "certificate authority"
+
+        return {
+            'status': 'success', 
+            'message': 'Login successful', 
+            'jwt_token': user.jwt_token, 
+            'user_id': user.id,
+            'role': role
+        }
     else:
         return {'status': 'error', 'message': 'Invalid username or password'}
 
@@ -102,10 +126,10 @@ def get_user_data(session, jwt_token):
                 'status': 'success',
                 'message' : 'User data retrieved successfully',
                 'user_id': user.id,
-                
+                'user_name': user.username,
                 'national_id': user.national_id,
                 'session_key': user.session_key,
-                'public_key': user.public_key
+                'public_key': user.public_key,                
             }
             return user_data
         else:
@@ -353,3 +377,26 @@ def store_certificate(session, client_name: str,ca_name,certificate_data: str):
         print(f"IntegrityError: {e}")
         session.rollback()
         return {'status': 'error', 'message': 'Certificate creation failed (IntegrityError)'}
+
+
+def get_all_csrs(session):
+    try:
+        users = session.query(User).filter(User.csr_pem.isnot(None)).all()
+
+        csrs_data = {}
+
+        for user in users:
+            csr_info = {
+                'user_id': user.id,
+                'username': user.username,
+                'csr_pem': user.csr_pem
+            }
+
+            csrs_data[user.id] = csr_info
+
+        return {'status': 'success', 'csrs': csrs_data}
+
+    except Exception as e:
+        print(f"Error fetching CSRs: {e}")
+        return {'status': 'error', 'message': 'Error fetching CSRs'}
+
