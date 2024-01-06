@@ -78,7 +78,8 @@ class Login(tk.Frame):
             professor_frame = Professor(self.master.master, token, user_id)
             professor_frame.pack()
         else:
-            ca_frame = CA(self.master.master)
+            csrs_response = send_request ('get_all_csrs',{'jwt_token':token})
+            ca_frame = CA(self.master.master, token, csrs_response['csrs'])
             ca_frame.pack()
 
 
