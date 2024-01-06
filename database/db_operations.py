@@ -129,9 +129,10 @@ def get_user_data(session, jwt_token):
                 'status': 'success',
                 'message' : 'User data retrieved successfully',
                 'user_id': user.id,
+                'user_name': user.username,
                 'national_id': user.national_id,
                 'session_key': user.session_key,
-                'public_key': user.public_key
+                'public_key': user.public_key,                
             }
             return user_data
         else:

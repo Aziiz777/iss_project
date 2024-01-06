@@ -126,8 +126,7 @@ def handle_client(client_socket, session,server_public_key=None):
             challenge_response =generate_challenge()
             send_response(client_socket,challenge_response)
         
-        elif request_json['action'] == 'send_csr': 
-            print("error here ")
+        elif request_json['action'] == 'send_csr':             
             user_data = get_user_data(session, jwt_token)
             session_key = user_data['session_key']
             user_id = user_data['user_id']
@@ -135,8 +134,7 @@ def handle_client(client_socket, session,server_public_key=None):
             decrypted_request_data = decrypt_data(session_key, encrypted_request_data)
             decrypted_request_json = json.loads(decrypted_request_data)
             professor_csr = decrypted_request_json['professor_csr']
-            jwt_token = decrypted_request_json['jwt_token']
-            print("error here ")
+            jwt_token = decrypted_request_json['jwt_token']            
             send_csr_handler(client_socket,session,jwt_token,user_id,professor_csr,session_key)
         elif request_json['action'] == 'sign_csr':
             jwt_token = request_json['data']['jwt_token']
@@ -334,7 +332,7 @@ def create_certificate_authority(session, name,password):
 
     private_key_pem = save_private_key_pem(private_key)
     public_key_pem = save_public_key_pem(public_key)
-    print(private_key_pem)
+    
     print(private_key_pem.decode())
 
     # Define file paths in the current directory
