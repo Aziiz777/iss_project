@@ -15,9 +15,6 @@ from sqlalchemy.exc import IntegrityError
 
 
 
-
-
-
 def hash_password(password):
     return hashlib.sha256(password.encode('utf-8')).hexdigest()
 
@@ -105,6 +102,7 @@ def get_user_data(session, jwt_token):
                 'status': 'success',
                 'message' : 'User data retrieved successfully',
                 'user_id': user.id,
+                
                 'national_id': user.national_id,
                 'session_key': user.session_key,
                 'public_key': user.public_key
