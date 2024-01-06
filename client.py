@@ -88,8 +88,10 @@ def send_request(action, data,jwt_token=None):
             encrypted_data =encrypt_data(session_key, json.dumps(request_data['data']))
             encrypted_data_base64 = base64.b64encode(encrypted_data).decode('utf-8')
             request_data['data'] = encrypted_data_base64
-            # print(f"The request_data is: {request_data}")
+            print(f"The request_data is: {request_data}")
             request_json = json.dumps(request_data)
+            print(f"The request_json is: {request_json}")
+
             client_socket.send(request_json.encode('utf-8'))
             length = len(request_json)
             client_socket.send(str(length).encode('utf-8').ljust(16))
@@ -139,6 +141,8 @@ def send_request(action, data,jwt_token=None):
                 print(f"decrypted Data: {response_json}")
                 return response_json
             if action =='send_csr':
+                print(f"received data {received_data.decode('utf-8')}")
+
                 response_json = json.loads(received_data.decode('utf-8'))
                 print(f"encrypted Data: {response_json['data']}")
                 encrypted_data = base64.b64decode(response_json.get('data', '').strip())
@@ -149,7 +153,7 @@ def send_request(action, data,jwt_token=None):
 
             else:
                 decrypted_response = received_data
-            response_json = json.loads(decrypted_response)
+                response_json = json.loads(decrypted_response)
 
             return response_json  # Return the entire response
 
@@ -269,7 +273,7 @@ def save_public_key_pem(public_key):
     return public_key_pem
 
 
-def generate_csr(private_key_pem, common_name):
+def generate_csr(private_key_pem, common_name, challenge=None, solution=None):
     # Load the private key from PEM format
     private_key = serialization.load_pem_private_key(
         private_key_pem.encode(),
@@ -285,13 +289,22 @@ def generate_csr(private_key_pem, common_name):
         x509.NameAttribute(NameOID.COMMON_NAME, common_name)
     ]))
 
-    # Sign the CSR with the private key
-    csr = builder.sign(private_key, hashes.SHA256(), default_backend())
+    # Include challenge and solution in the CSR extensions
+    if challenge and solution:
+        csr = builder.add_extension(
+            x509.SubjectAlternativeName([
+                x509.DNSName(f"{challenge}={solution}")
+            ]),
+            critical=False,
+        ).sign(private_key, hashes.SHA256(), default_backend())
+    else:
+        csr = builder.sign(private_key, hashes.SHA256(), default_backend())
 
     # Convert the CSR to PEM format
     csr_pem = csr.public_bytes(encoding=serialization.Encoding.PEM)
 
     return csr_pem.decode()
+
 
 def read_key_from_file(file_path):
     with open(file_path, 'r') as key_file:
@@ -302,8 +315,8 @@ def read_key_from_file(file_path):
 if __name__ == "__main__":
     # Test creating an account
     print("---------------------Start Create Account Test --------------------------------\n")
-    create_account_response = send_request('create_account', {'username': 'testuserStudent', 'password': 'testpasswordStudent','role':'student'})
-    # create_account_response = send_request('create_account', {'username': 'testuserProfessor', 'password': 'testpasswordProfessor','role':'professor'})
+    # create_account_response = send_request('create_account', {'username': 'testuserStudent', 'password': 'testpasswordStudent','role':'student'})
+    create_account_response = send_request('create_account', {'username': 'testuserProfessor', 'password': 'testpasswordProfessor','role':'professor'})
     print(f"{create_account_response} \n")
     print("---------------------End Create Account Test --------------------------------")
 
@@ -311,8 +324,8 @@ if __name__ == "__main__":
     # Test login
     print("\n---------------------Start LogIn Test --------------------------------\n")
 
-    # login_response = send_request('login', {'username': 'testuserProfessor', 'password': 'testpasswordProfessor'})
-    login_response = send_request('login', {'username': 'testuserStudent', 'password': 'testpasswordStudent'})
+    login_response = send_request('login', {'username': 'testuserProfessor', 'password': 'testpasswordProfessor'})
+    # login_response = send_request('login', {'username': 'testuserStudent', 'password': 'testpasswordStudent'})
     print(f"{login_response} \n")
     print("---------------------End LogIn Test --------------------------------")
 
@@ -366,53 +379,53 @@ if __name__ == "__main__":
     print(f"server_public_key: {server_public_key}")
     print("-----------------------End HandShaking-------------------------------")
 
-    print("\n------------------Start sending projects_descriptions-----------------")
-    project_descriptions = ['Project 1: Description', 'Project 2: Description', 'Project 3: Description']
-    action = 'project_descriptions'
-    data = {'jwt_token': jwt_token,'user_id':user_id,'session_key':session_key, 'project_descriptions': project_descriptions}
-    send_request(action, data, jwt_token)
-    print("\n------------------End sending projects_descriptions-----------------")
+    # print("\n------------------Start sending projects_descriptions-----------------")
+    # project_descriptions = ['Project 1: Description', 'Project 2: Description', 'Project 3: Description']
+    # action = 'project_descriptions'
+    # data = {'jwt_token': jwt_token,'user_id':user_id,'session_key':session_key, 'project_descriptions': project_descriptions}
+    # send_request(action, data, jwt_token)
+    # print("\n------------------End sending projects_descriptions-----------------")
 
 
-    get_all_project_response = send_request ('get_all_project_descriptions',{'jwt_token':jwt_token})
-    # print(get_all_project_response)
-    # # Assuming the response structure
-    # response = {
-    # 'status': 'success',
-    # 'project_descriptions': {
-    #     '1': {'user_id': 1, 'username': 'testuser17', 'project_descriptions': ['Project 1: Description', 'Project 2: Description', 'Project 3: Description']},
-    #     '2': {'user_id': 2, 'username': 'testuser173', 'project_descriptions': ['Project 1: Description', 'Project 2: Description', 'Project 3: Description']}
+    # get_all_project_response = send_request ('get_all_project_descriptions',{'jwt_token':jwt_token})
+    # # print(get_all_project_response)
+    # # # Assuming the response structure
+    # # response = {
+    # # 'status': 'success',
+    # # 'project_descriptions': {
+    # #     '1': {'user_id': 1, 'username': 'testuser17', 'project_descriptions': ['Project 1: Description', 'Project 2: Description', 'Project 3: Description']},
+    # #     '2': {'user_id': 2, 'username': 'testuser173', 'project_descriptions': ['Project 1: Description', 'Project 2: Description', 'Project 3: Description']}
+    # # }
+    # # }
+
+    # student_id = 2
+    # project_id = 1
+
+    # # # Get the project descriptions for the specific user and project
+    # user_projects = get_all_project_response.get('project_descriptions', {})
+    # project_description = user_projects.get(str(student_id), {}).get('project_descriptions', [])[project_id - 1]
+    # client_private_key = keys_info["private_key"]
+    # private_key_bytes = bytes.fromhex(client_private_key[2:])
+
+    # # # Example marks data
+    # marks_data = {
+    #     'student_id': student_id,
+    #     'professor_id':user_id,
+    #     'project_id': project_id,
+    #     'mark': 90,
     # }
-    # }
 
-    student_id = 2
-    project_id = 1
+    # # Encode marks_data to a string
+    # marks_data_str = json.dumps(marks_data, sort_keys=True)
+    # signed_message = messages.encode_defunct(text=marks_data_str)
 
-    # # Get the project descriptions for the specific user and project
-    user_projects = get_all_project_response.get('project_descriptions', {})
-    project_description = user_projects.get(str(student_id), {}).get('project_descriptions', [])[project_id - 1]
-    client_private_key = keys_info["private_key"]
-    private_key_bytes = bytes.fromhex(client_private_key[2:])
+    # # # Sign the message
+    # signature = Account.sign_message(signed_message, private_key_bytes)
 
-    # # Example marks data
-    marks_data = {
-        'student_id': student_id,
-        'professor_id':user_id,
-        'project_id': project_id,
-        'mark': 90,
-    }
-
-    # Encode marks_data to a string
-    marks_data_str = json.dumps(marks_data, sort_keys=True)
-    signed_message = messages.encode_defunct(text=marks_data_str)
-
-    # # Sign the message
-    signature = Account.sign_message(signed_message, private_key_bytes)
-
-    # # Send marks for the specific project
-    print("\n------------------Start sending projects marks-----------------")
-    send_request('send_marks', {'jwt_token': jwt_token,'marks_data_signature':signature.signature.hex(), 'marks_data': marks_data,'session_key':session_key},jwt_token)
-    print("\n------------------End sending projects marks -----------------\n")
+    # # # Send marks for the specific project
+    # print("\n------------------Start sending projects marks-----------------")
+    # send_request('send_marks', {'jwt_token': jwt_token,'marks_data_signature':signature.signature.hex(), 'marks_data': marks_data,'session_key':session_key},jwt_token)
+    # print("\n------------------End sending projects marks -----------------\n")
 
 
     professor_private, professor_public = generate_ecdsa_key_pair()
@@ -423,8 +436,15 @@ if __name__ == "__main__":
     # private_key_content = read_key_from_file('private_key.pem')
     # print(private_key_content)
     # public_key_content = read_key_from_file('public_key.pem')
+    print("----------------generate new challenge -----------------------------")
+    challenge_response = send_request('generate_challenge',{},jwt_token)
+    print(f"the challenge :\n    {challenge_response}")
+
+
     print("----------------generating professor csr -----------------------------")
-    professor_csr = generate_csr(private_key_pem.decode(),"testuserProfessor")
+    challenge = challenge_response.get('challenge','')
+    solution = eval(challenge)
+    professor_csr = generate_csr(private_key_pem.decode(),"testuserProfessor",challenge,solution)
     print(f"the csr :\n    {professor_csr}")
 
 
@@ -452,8 +472,3 @@ if __name__ == "__main__":
     certificate_data = sign_csr_response.get('certificate_data', "")
     print("----------------End signning professor csr -----------------------------")
     # print("After send_request:", certificate_data)
-    login_response = send_request('login', {'username': 'name', 'password': 'caPassword'})
-
-
-    
-

@@ -26,15 +26,19 @@ from cryptography.hazmat.primitives import hashes, hmac
 from cryptography.x509.oid import ExtensionOID
 
 
+
+
 import time
 
 def handle_client(client_socket, session,server_public_key=None):
    
     try:
         # Receive client request
-        request_data = client_socket.recv(1024)
+        request_data = client_socket.recv(2048)
         print(f"Received raw data: {request_data}")
         request_json = json.loads(request_data)
+
+
         print(f"Received json:{request_json} ")
 
         # Extract JWT token from headers if present
@@ -136,7 +140,12 @@ def handle_client(client_socket, session,server_public_key=None):
             marks_data_signature = decrypted_request_json['marks_data_signature']
             jwt_token = decrypted_request_json['jwt_token']
             send_marks_handler(client_socket, session,jwt_token,client_public_key,marks_data_signature,marks_data,session_key)
+        elif request_json['action'] == 'generate_challenge': 
+            challenge_response =generate_challenge()
+            send_response(client_socket,challenge_response)
+        
         elif request_json['action'] == 'send_csr': 
+            print("error here ")
             user_data = get_user_data(session, jwt_token)
             session_key = user_data['session_key']
             user_id = user_data['user_id']
@@ -145,6 +154,7 @@ def handle_client(client_socket, session,server_public_key=None):
             decrypted_request_json = json.loads(decrypted_request_data)
             professor_csr = decrypted_request_json['professor_csr']
             jwt_token = decrypted_request_json['jwt_token']
+            print("error here ")
             send_csr_handler(client_socket,session,jwt_token,user_id,professor_csr,session_key)
         elif request_json['action'] == 'sign_csr':
             jwt_token = request_json['data']['jwt_token']
@@ -159,9 +169,9 @@ def handle_client(client_socket, session,server_public_key=None):
             ca_private_key = ca_data['private_key']
             print(ca_private_key)
             print('erorororor')
-            signed_certificate = sign_csr(client_csr,ca_private_key,ca_data['username'])
+            signed_certificate_response = sign_csr(client_csr,ca_private_key,ca_data['username'])
             print('erorororor')
-            store_certificate_handler(client_socket,session,signed_certificate)
+            store_certificate_handler(client_socket,session,signed_certificate_response.get('certificate',''))
 
         else:
             send_response(client_socket, {'status': 'error', 'message': 'Invalid action'})
@@ -247,6 +257,21 @@ def send_marks_handler(client_socket,session, jwt_token,client_public_key,marks_
     send_response(client_socket, {'data': encrypted_response_base64})
     # send_response(client_socket,response_data)
 
+
+def generate_challenge():
+    operators = {'+': '+', '-': '-', '*': '*'}
+    operand1 = secrets.randbelow(10) + 1
+    operand2 = secrets.randbelow(10) + 1
+    operator_symbol = secrets.choice(list(operators.keys()))
+    
+    challenge = f"{operand1} {operator_symbol} {operand2}"
+    response = {
+        'challenge': challenge,
+        'operator': operator_symbol,
+        'operands': [operand1, operand2]
+        }
+    return response
+
 def send_csr_handler(client_socket,session,jwt_token,user_id,professor_csr,session_key):
     response_data = store_csr(session, jwt_token,user_id, professor_csr)
     response_json = json.dumps(response_data)
@@ -258,6 +283,7 @@ def send_csr_handler(client_socket,session,jwt_token,user_id,professor_csr,sessi
 def store_certificate_handler(client_socket,session, certificate):
     print("nooooo error ")
     certificate_info = retrieve_certificate_info(certificate)
+    print(certificate_info)
     response_data = store_certificate(session , certificate_info['subject'].get_attributes_for_oid(NameOID.COMMON_NAME)[0].value,certificate_info['issuer'].get_attributes_for_oid(NameOID.COMMON_NAME)[0].value,certificate)
     print("nooooo error ")
     send_response(client_socket,response_data)
@@ -270,8 +296,14 @@ def send_response(client_socket, response_data):
         if client_socket.fileno() != -1:
             print(f"send length : {length.encode('utf-8')}")
             client_socket.send(length.encode('utf-8'))
-            # print(f"send data : {response_data.encode('utf-8')}")
+            # Wait for an acknowledgment from the client before sending data
+            # acknowledgment = client_socket.recv(10)
+            # print(f" hereee{acknowledgment}")
+            # if acknowledgment == b'1':
+            print(f"send data : {response_data.encode('utf-8')}")
             client_socket.send(response_data.encode('utf-8'))
+            # else:
+            #     print("Client did not acknowledge the length.")
         else:
             print("Socket is closed.")
     except ConnectionAbortedError:
@@ -377,33 +409,56 @@ def generate_csr(private_key_pem, common_name):
 
 
 def sign_csr(csr_pem, ca_private_key_pem, ca_name):
-    csr = x509.load_pem_x509_csr(csr_pem.encode(), default_backend())
-    ca_private_key = serialization.load_pem_private_key(
-        ca_private_key_pem.encode(),
-        password=None,
-        backend=default_backend()
-    )
+    try:
+        print("error here1")
+        csr = x509.load_pem_x509_csr(csr_pem.encode(), default_backend())
+        print("error here2")
 
-    certificate = x509.CertificateBuilder().subject_name(
-        csr.subject
-    ).issuer_name(
-        x509.Name([
-            x509.NameAttribute(NameOID.COMMON_NAME, ca_name)
-        ])
-    ).public_key(
-        csr.public_key()
-    ).serial_number(
-        x509.random_serial_number()
-    ).not_valid_before(
-        datetime.utcnow()
-    ).not_valid_after(
-        datetime.utcnow() + timedelta(days=365)  # Adjust validity period as needed
-    ).sign(ca_private_key, hashes.SHA256(), default_backend())
+        ca_private_key = serialization.load_pem_private_key(
+            ca_private_key_pem.encode(),
+            password=None,
+            backend=default_backend()
+        )
 
-    certificate_pem = certificate.public_bytes(encoding=serialization.Encoding.PEM)
+        challenge_extension = csr.extensions.get_extension_for_class(x509.SubjectAlternativeName)
+        challenge_values = challenge_extension.value.get_values_for_type(x509.DNSName)
 
-    return certificate_pem.decode()
+        if not challenge_values:
+            raise ValueError("CSR does not contain the challenge extension")
 
+        challenge_solution_pair = challenge_values[0].split("=")
+        if len(challenge_solution_pair) != 2:
+            raise ValueError("Invalid format for challenge extension")
+
+        received_challenge, received_solution = challenge_solution_pair
+
+        # Perform the challenge verification (you can customize this based on your challenge generation logic)
+        expected_solution = str(eval(received_challenge))  # Example: Evaluate the expression to get the expected solution
+        if received_solution != expected_solution:
+            raise ValueError("Challenge verification failed")
+
+        certificate = x509.CertificateBuilder().subject_name(
+            csr.subject
+        ).issuer_name(
+            x509.Name([
+                x509.NameAttribute(NameOID.COMMON_NAME, ca_name)
+            ])
+        ).public_key(
+            csr.public_key()
+        ).serial_number(
+            x509.random_serial_number()
+        ).not_valid_before(
+            datetime.utcnow()
+        ).not_valid_after(
+            datetime.utcnow() + timedelta(days=365)
+        ).sign(ca_private_key, hashes.SHA256(), default_backend())
+
+        certificate_pem = certificate.public_bytes(encoding=serialization.Encoding.PEM)
+
+        return {'status': 'success', 'message': 'CSR signed successfully', 'certificate': certificate_pem.decode()}
+    
+    except Exception as e:
+        return {'status': 'error', 'message': str(e), 'certificate': None}
 
 # def validate_csr(csr_pem, ca_public_key):
 #     try:
@@ -486,6 +541,7 @@ def retrieve_certificate_info(certificate_pem):
         # 'key_usage': key_usage,
         'signature_algorithm': signature_algorithm
     }
+
 
 
 

@@ -345,6 +345,7 @@ def store_certificate(session, client_name: str,ca_name,certificate_data: str):
     try:
         # Retrieve the user by username
         print(1)
+        print(client_name,ca_name)
         user = session.query(User).filter(User.username == client_name).first()
         print(2)
         if user:
