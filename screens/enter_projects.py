@@ -6,9 +6,11 @@ from client import send_request
 from tkinter import messagebox as messagebox
 
 class Project:
-    def __init__(self, name, desc):
+    def __init__(self, name, desc, user_id=None, project_id=None):
         self.name = name
         self.desc = desc
+        self.user_id = user_id
+        self.project_id = project_id
 
     def get_project_info(self):
         info = f'{self.name}: {self.desc.rstrip()}'

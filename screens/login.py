@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import messagebox
 from client import send_request
 from screens.national_id import NationalId
+from screens.send_marks import SendMarks
 
 class Login(tk.Frame):
     def __init__(self, master, show_main):
@@ -73,7 +74,24 @@ class Login(tk.Frame):
             national_id_frame = NationalId(self.master.master, token, user_id)
             national_id_frame.pack()
         elif role.lower() == 'professor':
-            print('PROF')
+            response = send_request(
+                'get_all_project_descriptions',
+                {
+                    'jwt_token': token
+                }
+            )
+            if response['status'].lower() == 'success':
+                args = {
+                    'user_id': user_id,
+                    'token': token,
+                    'data': response
+                }
+                        
+                send_marks_frame = SendMarks(self.master.master, args)
+                send_marks_frame.pack() 
+            else:
+                messagebox.showerror('Error', response)
+
 
     def back(self):
         self.destroy()        
