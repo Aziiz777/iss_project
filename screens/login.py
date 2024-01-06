@@ -3,6 +3,7 @@ from tkinter import messagebox
 from client import send_request
 from screens.national_id import NationalId
 from screens.professor import Professor
+from screens.ca import CA
 
 class Login(tk.Frame):
     def __init__(self, master, show_main):
@@ -76,6 +77,9 @@ class Login(tk.Frame):
         elif role.lower() == 'professor':
             professor_frame = Professor(self.master.master, token, user_id)
             professor_frame.pack()
+        else:
+            ca_frame = CA(self.master.master)
+            ca_frame.pack()
 
 
     def back(self):
