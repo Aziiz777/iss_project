@@ -119,9 +119,20 @@ def get_user_data(session, jwt_token):
         payload = jwt.decode(jwt_token, SECRET_KEY, algorithms=[ALGORITHM])
 
         user_id_from_token = int(payload.get("sub"))
-
-        user = session.query(User).filter(User.id == user_id_from_token, User.jwt_token == jwt_token).first()
-        if user:
+        user, user_csr = session.query(User, Certificate.certificate_data).outerjoin(User.certificate).filter(User.id == user_id_from_token, User.jwt_token == jwt_token).first()
+        if user and user_csr is not None:
+            user_data = {
+                'status': 'success',
+                'message' : 'User data retrieved successfully',
+                'user_id': user.id,
+                'user_name': user.username,
+                'national_id': user.national_id,
+                'session_key': user.session_key,
+                'public_key': user.public_key,
+                'certificate': user_csr
+            }
+            return user_data
+        elif user:
             user_data = {
                 'status': 'success',
                 'message' : 'User data retrieved successfully',

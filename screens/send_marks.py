@@ -100,7 +100,6 @@ class SendMarks(tk.Frame):
             'mark': mark,
         }
 
-        print(marks_data)
         private_key = self.keys_info['private_key']
         private_key_bytes = bytes.fromhex(private_key[2:])
 
@@ -111,16 +110,37 @@ class SendMarks(tk.Frame):
         # Sign the message
         signature = Account.sign_message(signed_message, private_key_bytes)
 
-        response = send_request(
-            'send_marks',
+        user_data_response = send_request(
+            'get_user_data',
             {
-                'jwt_token': self.token,
-                'marks_data_signature': signature.signature.hex(),
-                'marks_data': marks_data,
-                'session_key': self.session_key
+                'jwt_token': self.token
             },
             self.token
         )
+        
+        if 'certificate' in user_data_response:
+            response = send_request(
+                'send_marks',
+                {
+                    'jwt_token': self.token,
+                    'marks_data_signature': signature.signature.hex(),
+                    'marks_data': marks_data,
+                    'session_key': self.session_key,
+                    'certificate': user_data_response['certificate']
+                },
+                self.token
+            )
+        else:
+            response = send_request(
+                'send_marks',
+                {
+                    'jwt_token': self.token,
+                    'marks_data_signature': signature.signature.hex(),
+                    'marks_data': marks_data,
+                    'session_key': self.session_key,
+                },
+                self.token
+            )
 
         message = response['message']
         messagebox.showinfo('Response', message)
